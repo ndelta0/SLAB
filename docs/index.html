@@ -12,13 +12,15 @@
     <script>
     function getUrlVars() {
         var vars = {};
-        var parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m,key,value) {
+        var parts = window.location.href.replace(/[#&]+([^=&]+)=([^&]*)/gi, function(m,key,value) {
             vars[key] = value;
         });
         return vars;
     }
-    var token = getUrlVars()["code"];
+    var token = getUrlVars()["access_token"];
     document.write(token)
     </script>
+    <br/>
+    <u>Paste this token into you Discord conversation with bot</u>
 </body>
 </html>
