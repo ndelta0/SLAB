@@ -7,8 +7,10 @@ import spotify_api as sapi
 
 # Variables
 PREF = '!!'
-boundChannel = '516168648373698563'
-DISCORDTOKEN = 'NTE2MTY5MTUxODQ1MzY3ODA5.DtvvnQ.3x4uiFEM5OlXrXeqPuMDBIfOtKY'
+boundChannel = '409066385453613079'
+boundChannel = '409066385453613079'
+# DISCORDTOKEN = 'NTE2MTY5MTUxODQ1MzY3ODA5.DtvvnQ.3x4uiFEM5OlXrXeqPuMDBIfOtKY'
+DISCORDTOKEN = 'NDcyODUxOTU1ODUzNTU3Nzgw.DuHqow.khRFp2p8vmeWXDVxDTc2loou3tk'
 # <----->
 
 client = discord.Client()
@@ -17,7 +19,7 @@ async def statusChange():
     await client.wait_until_ready()
     while not client.is_closed:
         while 1:
-            await client.change_presence(game = discord.Game(name='Spotiscord v1'))
+            await client.change_presence(game = discord.Game(name='SLAB v1'))
             await asyncio.sleep(15)
             helpStr = 'Type %shelp for help!' % PREF
             await client.change_presence(game = discord.Game(name=helpStr))
@@ -28,7 +30,9 @@ async def on_message(message):
     global PREF
     global boundChannel
     if message.author == client.user:
-            return
+        return
+    # if message.system_content:
+    #     return
     if message.channel.id == boundChannel or message.channel.is_private == True:
         if message.content.lower().startswith('%shello' % PREF):
             msg = 'Hello {0.author.mention}'.format(message)
@@ -117,15 +121,17 @@ async def on_message(message):
             await client.send_message(message.author, ('To verify the account go to the following page and paste in the token:\n' + response))
             answ = await client.wait_for_message(author=message.author, timeout=60)
             authResponse = sapi.verifyPremiumStep2(answ.content)
-            if authResponse == True or False:
-                if authResponse == True:
-                    await client.send_message(message.author, 'You have premium subscription. You just got \'premium\' role')
-                    role = discord.utils.get(serverObj.roles, name='Premium')
-                    await client.add_roles(memberObj, role)
-                else:
-                    await client.send_message(message.author, 'You don\'t have a premium subscribtion')
+            if authResponse == True:
+                await client.send_message(message.author, 'You have premium subscription. You just got \'premium\' role')
+                role = discord.utils.get(client._servers['408958645745745942'].roles, name='PREMIUM :star:')
+                await client.add_roles(memberObj, role)
+            elif authResponse == False:
+                await client.send_message(message.author, 'You don\'t have a premium subscribtion')
             else:
                 await client.send_message(message.author, authResponse)
+        if message.content.lower().startswith('%sdebug' % PREF):
+            variable = client
+            await asyncio.sleep(5)
     elif message.content.lower().startswith('%sbind' % PREF):
         if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) == True:
             if boundChannel == message.channel.id:
@@ -136,8 +142,6 @@ async def on_message(message):
                 return boundChannel
         else:
             await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
-    else:
-        await client.send_message(message.channel, 'Invalid channel')
 
 @client.event
 async def on_ready():
@@ -145,6 +149,7 @@ async def on_ready():
     print(client.user.name)
     print(client.user.id)
     print('------')
+    client.
 
 client.loop.create_task(statusChange())
 client.run(DISCORDTOKEN)
