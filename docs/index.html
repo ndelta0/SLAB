@@ -18,9 +18,17 @@
         return vars;
     }
     var token = getUrlVars()["access_token"];
-    document.write(token)
+    var output = "<input type\"text\" value=\"{}\" id=\"tokenBox\">";
+    document.write(output.replace(/{}/, token));
+    document.write("<button onclick=\"copyToken()\">Copy token</button>");
+    function copyToken() {
+        var copyToken = document.getElementById("tokenBox");
+        copyToken.select();
+        document.execCommand("copy");
+        alert("Copied the token. You can now paste it into Discord.");
+    }
     </script>
     <br/>
-    <u>Paste this token into you Discord conversation with bot</u>
+    <u>Paste this token into you Discord conversation with bot.</u> <b>You can copy the token with this fun button</b>
 </body>
 </html>
