@@ -91,7 +91,10 @@ def searchSong(q, market = 'PL'):
 		json.dump(respJson, f)
 	if resp.status_code == 200:
 		if respJson['tracks']['items'] == []:
-			searchSong(q, 'US')
+			if market == 'US':
+				return('No results.')
+			else:
+			    searchSong(q, 'US')
 		else:
 			trackURL = respJson['tracks']['items'][0]['external_urls']['spotify']
 			trackURI = respJson['tracks']['items'][0]['uri']
