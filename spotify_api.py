@@ -1,8 +1,8 @@
 ## Imports
 import requests as rq
+import base64
 import json
 import webbrowser as wb
-import base64
 
 with open('tokens.json') as f:
 	tokensStr = json.load(f)
@@ -26,7 +26,7 @@ def tokenSwap():
 	global clientID
 	global clientSecret
 
-	wb.open('https://accounts.spotify.com/authorize?client_id=d3df69ad53ad4fe0afe621a68a2e852b&response_type=code&redirect_uri=http://localhost/&scope=playlist-modify-public', new=2)
+	wb.open('https://accounts.spotify.com/authorize?client_id=d3df69ad53ad4fe0afe621a68a2e852b&response_type=code&redirect_uri=https://march3wqa.github.io/Spotiscord/index.html&scope=playlist-modify-public', new=2)
 	apiCode = input('Code >> ')
 
 	authKey = clientID + ':' + clientSecret
@@ -34,7 +34,7 @@ def tokenSwap():
 	authKeyBytes = base64.b64encode(authKeyBytes)
 	authKey = bytes.decode(authKeyBytes)
 	authHeader = {'Authorization': 'Basic '+ authKey}
-	dataBody = {'grant_type': 'authorization_code', 'code': apiCode, 'redirect_uri': 'http://localhost/'}
+	dataBody = {'grant_type': 'authorization_code', 'code': apiCode, 'redirect_uri': 'https://march3wqa.github.io/Spotiscord/index.html'}
 
 	resp = rq.post(url = 'https://accounts.spotify.com/api/token', data = dataBody, headers = authHeader)
 	respJson = resp.json()
@@ -83,7 +83,7 @@ def tokenRefresh():
 		tokenSwap()
 
 def searchSong(q, market = 'PL'):
-	query = q.replace(' ', '+')
+	query = q.replace(' ', '%20')
 	params = {'q': query, 'type': 'track', 'limit': 1, 'offset': 0, 'market': market}
 	resp = rq.get(url = 'https://api.spotify.com/v1/search', params = params, headers = header)
 	respJson = resp.json()
@@ -165,6 +165,22 @@ def getPlaylist():
     global playlistURL
     return playlistURL
 
-def verifyPremium():
+def verifyPremiumStep1():
     baseUrl = 'https://accounts.spotify.com/authorize'
-	queryParams = 'client_id=%s&response_type=token&redirect_uri='
+    queryParams = 'client_id={}&response_type=token&redirect_uri=https://march3wqa.github.io/Spotiscord/index.html&scope=user-read-email%20user-read-private%20user-read-birthdate'
+    finalUrl = baseUrl + '?' + queryParams.format(clientID)
+    return finalUrl
+
+def verifyPremiumStep2(token):
+    authHeader = {'Authorization': 'Bearer ' + token}
+    resp = rq.get(url='https://api.spotify.com/v1/me', headers=authHeader)
+    respJson = resp.json()
+    if resp.status_code == 200:
+        if respJson['product'] == 'premium':
+            return True
+        else:
+            return False
+    else:
+        print(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
+        return(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
+

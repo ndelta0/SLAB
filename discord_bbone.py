@@ -1,7 +1,9 @@
-import spotify_api as sapi
 import discord
 from discord.compat import create_task
+
 import asyncio
+import spotify_api as sapi
+
 
 # Variables
 PREF = '!!'
@@ -25,9 +27,9 @@ async def statusChange():
 async def on_message(message):
     global PREF
     global boundChannel
-    if message.channel.id == boundChannel:
-        if message.author == client.user:
+    if message.author == client.user:
             return
+    if message.channel.id == boundChannel or message.channel.is_private == True:
         if message.content.lower().startswith('%shello' % PREF):
             msg = 'Hello {0.author.mention}'.format(message)
             await client.send_message(message.channel, msg)
@@ -107,16 +109,23 @@ async def on_message(message):
             else:
                 await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
         if message.content.lower().startswith('%shelp' % PREF):
-            await client.send_message(message.channel, 'Available commands:\n```%ssearch <query> - searches for a song to add it to playlist\n%splaylist - shows the playlist\n%shelp - shows this help```\nAdditional commands for admins:\n```%screate <name> - creates playlist with name <name>\n%sdelete - deletes playlist\n%sprefix <new prefix> - sets the prefix\n%sbind - binds bot to specified channel (where it accepts commands```\n**NOTE:** Bot only allows for one playlist for now!' % (PREF, PREF, PREF, PREF, PREF, PREF, PREF))
-
-
+            await client.send_message(message.channel, 'Available commands:\n```%sverify - allows you to verify your Spofity account\n%ssearch <query> - searches for a song to add it to playlist\n%splaylist - shows the playlist\n%shelp - shows this help```\nAdditional commands for admins:\n```%screate <name> - creates playlist with name <name>\n%sdelete - deletes playlist\n%sprefix <new prefix> - sets the prefix\n%sbind - binds bot to specified channel (where it accepts commands```\n**NOTE:** Bot only allows for one playlist for now!' % (PREF, PREF, PREF, PREF, PREF, PREF, PREF, PREF))
         if message.content.lower().startswith('%sverify' % PREF):
-            pass
-
-
-
-        else:
-            await client.send_message(message.channel, 'Unknown command. Use %shelp for list of available commands.' % PREF)
+            serverObj = message.author.server
+            memberObj = message.author
+            response = sapi.verifyPremiumStep1()
+            await client.send_message(message.author, ('To verify the account go to the following page and paste in the token:\n' + response))
+            answ = await client.wait_for_message(author=message.author, timeout=60)
+            authResponse = sapi.verifyPremiumStep2(answ.content)
+            if authResponse == True or False:
+                if authResponse == True:
+                    await client.send_message(message.author, 'You have premium subscription. You just got \'premium\' role')
+                    role = discord.utils.get(serverObj.roles, name='Premium')
+                    await client.add_roles(memberObj, role)
+                else:
+                    await client.send_message(message.author, 'You don\'t have a premium subscribtion')
+            else:
+                await client.send_message(message.author, authResponse)
     elif message.content.lower().startswith('%sbind' % PREF):
         if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) == True:
             if boundChannel == message.channel.id:
