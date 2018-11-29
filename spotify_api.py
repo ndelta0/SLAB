@@ -4,11 +4,11 @@ import json
 import webbrowser as wb
 import base64
 
-with open('bot\\tokens.json') as f:
+with open('tokens.json') as f:
 	tokensStr = json.load(f)
 	tokens = json.loads(tokensStr)
 
-with open('bot\\playlists.json') as f:
+with open('playlists.json') as f:
 	playlistsStr = json.load(f)
 	playlists = json.loads(playlistsStr)
 
@@ -48,7 +48,7 @@ def tokenSwap():
 		header['Authorization'] = 'Bearer '+ accessToken
 		tokens = {'access_token': accessToken, 'refresh_token': refreshToken}
 		tokensJson = json.dumps(tokens)
-		with open('bot\\tokens.json', 'w') as f:
+		with open('tokens.json', 'w') as f:
 			json.dump(tokensJson, f)
 		return accessToken, refreshToken, header
 	else:
@@ -75,7 +75,7 @@ def tokenRefresh():
 		header['Authorization'] = 'Bearer '+ accessToken
 		tokens = {'access_token': accessToken, 'refresh_token': refreshToken}
 		tokensJson = json.dumps(tokens)
-		with open('bot\\tokens.json', 'w') as f:
+		with open('tokens.json', 'w') as f:
 			json.dump(tokensJson, f)
 		return accessToken, header
 	else:
@@ -122,7 +122,7 @@ def createPlaylist(name):
             playlistURL = respJson['external_urls']['spotify']
             playlists = {'playlist_url': playlistURL, 'playlist_id': playlistID}
             playlistsJson = json.dumps(playlists)
-            with open('bot\\playlists.json', 'w') as f:
+            with open('playlists.json', 'w') as f:
                 json.dump(playlistsJson, f)
             return ['Created playlist: **%s**' % name, playlists]
         else:
@@ -140,7 +140,7 @@ def removePlaylist():
     if resp.status_code == 200:
         playlists = {'playlist_url': 'none', 'playlist_id': 'none'}
         playlistsJson = json.dumps(playlists)
-        with open('bot\\playlists.json', 'w') as f:
+        with open('playlists.json', 'w') as f:
             json.dump(playlistsJson, f)
         return('Deleted successfully.')
     else:
@@ -166,4 +166,5 @@ def getPlaylist():
     return playlistURL
 
 def verifyPremium():
-    
+    baseUrl = 'https://accounts.spotify.com/authorize'
+	queryParams = 'client_id=%s&response_type=token&redirect_uri='
