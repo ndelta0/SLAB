@@ -4,3 +4,4 @@ requests
 base64
 json
 webbrowser
+mysql
