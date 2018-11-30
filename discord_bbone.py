@@ -26,9 +26,9 @@ settingsDict['boundChannels'] = boundChannelsList
 
 # Variables
 PREF = settingsDict['prefix']
-boundChannels = '516168648373698563' #settingsDict['boundChannels']
-DISCORDTOKEN = 'NTE2MTY5MTUxODQ1MzY3ODA5.DtvvnQ.3x4uiFEM5OlXrXeqPuMDBIfOtKY'
-# DISCORDTOKEN = settingsDict['discordToken']
+boundChannels = '409066385453613079' #settingsDict['boundChannels']
+# DISCORDTOKEN = 'NTE2MTY5MTUxODQ1MzY3ODA5.DtvvnQ.3x4uiFEM5OlXrXeqPuMDBIfOtKY'
+DISCORDTOKEN = settingsDict['discordToken']
 # <----->
 
 client = discord.Client()
