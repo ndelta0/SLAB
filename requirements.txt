@@ -1,1 +1,6 @@
 discord.py
+asyncio
+requests
+base64
+json
+webbrowser
