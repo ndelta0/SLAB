@@ -84,7 +84,8 @@ def tokenSwap():
 	global clientID
 	global clientSecret
 
-	wb.open('https://accounts.spotify.com/authorize?client_id=d3df69ad53ad4fe0afe621a68a2e852b&response_type=code&redirect_uri=https://march3wqa.github.io/Spotiscord/index.html&scope=playlist-modify-public', new=2)
+	# wb.open('https://accounts.spotify.com/authorize?client_id=d3df69ad53ad4fe0afe621a68a2e852b&response_type=code&redirect_uri=https://march3wqa.github.io/Spotiscord/index.html&scope=playlist-modify-public', new=2)
+	print('https://accounts.spotify.com/authorize?client_id=d3df69ad53ad4fe0afe621a68a2e852b&response_type=code&redirect_uri=https://march3wqa.github.io/Spotiscord/index.html&scope=playlist-modify-public')
 	apiCode = input('Code >> ')
 
 	authKey = clientID + ':' + clientSecret
