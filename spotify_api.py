@@ -1,27 +1,85 @@
 ## Imports
+import mysql.connector
 import requests as rq
 import base64
 import json
 import webbrowser as wb
 
-with open('tokens.json') as f:
-	tokensStr = json.load(f)
-	tokens = json.loads(tokensStr)
+## MySQL
+database = mysql.connector.connect(
+	host='db4free.net',
+	user='slabbot',
+	passwd='Zabciajest10/10',
+	database='slabbotdb'
+)
+botCursor = database.cursor()
 
-with open('playlists.json') as f:
-	playlistsStr = json.load(f)
-	playlists = json.loads(playlistsStr)
+botCursor.execute('SELECT * FROM bot_settings')
+settings = botCursor.fetchone()
+fields = [item[0] for item in botCursor.description]
+settingsDict = {}
+for i in range(len(settings)):
+    extendDict = {fields[i]: settings[i]}
+    settingsDict.update(extendDict)
+boundChannelsStr = settingsDict['boundChannels']
+boundChannelsList = boundChannelsStr.split()
+settingsDict['boundChannels'] = boundChannelsList
+
+botCursor.execute('SELECT * FROM playlists')
+playlists = botCursor.fetchall()
+fields = [item[0] for item in botCursor.description]
+playlistsList = []
+for i in range(len(playlists)):
+    playlistDict = {}
+    for k in range(len(playlists[i])):
+        extendDict = {fields[k]: playlists[i][k]}
+        playlistDict.update(extendDict)
+    usersWhoAddedStr = playlistDict['usersWhoAdded']
+    usersWhoAddedList = usersWhoAddedStr.split()
+    playlistDict['usersWhoAdded'] = usersWhoAddedList
+    playlistsList.append(playlistDict)
 
 ## Variables
-playlistURL = playlists["playlist_url"]
-playlistID = playlists["playlist_id"]
-accessToken = tokens["access_token"]
-refreshToken = tokens["refresh_token"]
-clientID = 'd3df69ad53ad4fe0afe621a68a2e852b'
-clientSecret = '9d998fca5b7444aa9ebf43c590e5d5c6'
+accessToken = settingsDict['spotifyAccessToken']
+refreshToken = settingsDict['spotifyRefreshToken']
+clientID = settingsDict['spotifyCliendID']
+clientSecret = settingsDict['spotifyClientSecret']
 header = {'Authorization': 'Bearer '+ accessToken}
 
 ## Functions
+def dbUpdateSettings(*parameters):
+    parametersStr = ''
+    for i in range(len(parameters)):
+        parametersStr = parametersStr + parameters[i][0] + ' = \'' + parameters[i][1] + '\''
+        if i == len(parameters)-1:
+            pass
+        else:
+            parametersStr = parametersStr + ', '
+    sql = 'UPDATE bot_settings SET %s' % parametersStr
+    botCursor.execute(sql)
+    database.commit()
+
+def dbUpdatePlaylists(action, name = None, url = None, id = None, usersWhoAdded = 'none'):
+    if action == 'create':
+        global playlistsList
+        sql = 'INSERT INTO playlists (name, url, id, usersWhoAdded) VALUES (\'%s\', \'%s\', \'%s\', \'%s\')' % (name, url, id, usersWhoAdded)
+        botCursor.execute(sql)
+        database.commit()
+        botCursor.execute('SELECT * FROM playlists')
+        playlists = botCursor.fetchall()
+        fields = [item[0] for item in botCursor.description]
+        playlistsList = []
+        for i in range(len(playlists)):
+            playlistDict = {}
+            for k in range(len(playlists[i])):
+                extendDict = {fields[k]: playlists[i][k]}
+                playlistDict.update(extendDict)
+            usersWhoAddedStr = playlistDict['usersWhoAdded']
+            usersWhoAddedList = usersWhoAddedStr.split()
+            playlistDict['usersWhoAdded'] = usersWhoAddedList
+            playlistsList.append(playlistDict)
+        return playlistsList
+
 def tokenSwap():
 	global clientID
 	global clientSecret
@@ -109,30 +167,25 @@ def searchSong(q, market = 'PL'):
 			return('Something went wrong. Try again.')
 
 def createPlaylist(name):
-    global playlistID
-    if playlistID == 'none':
-        dataPost = '{\"name\": \"%s\"}' % name
-        customHeader = header
-        headerAdditional = {'Content-Type': 'application/json'}
-        customHeader.update(headerAdditional)
+    dataPost = '{\"name\": \"%s\"}' % name
+    customHeader = header
+    headerAdditional = {'Content-Type': 'application/json'}
+    customHeader.update(headerAdditional)
 
-        resp = rq.post(url = 'https://api.spotify.com/v1/users/11172683931/playlists', data = dataPost, headers = customHeader)
-        respJson = resp.json()
+    resp = rq.post(url = 'https://api.spotify.com/v1/users/11172683931/playlists', data = dataPost, headers = customHeader)
+    respJson = resp.json()
 
-        if resp.status_code == 200 or resp.status_code == 201:
-            global playlistURL
-            playlistID = respJson['id']
-            playlistURL = respJson['external_urls']['spotify']
-            playlists = {'playlist_url': playlistURL, 'playlist_id': playlistID}
-            playlistsJson = json.dumps(playlists)
-            with open('playlists.json', 'w') as f:
-                json.dump(playlistsJson, f)
-            return ['Created playlist: **%s**' % name, playlists]
-        else:
-            print(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
-            return ['Error creating playlist.']
+    if resp.status_code == 200 or resp.status_code == 201:
+        global playlistsList
+        global playlistURL
+        global playlistID
+        playlistID = respJson['id']
+        playlistURL = respJson['external_urls']['spotify']
+        playlistsList = dbUpdatePlaylists('create', name, playlistURL, playlistID)
+        return playlistID, playlistURL, playlistsList
     else:
-        return ['Playlist already exists.']
+        print(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
+        return ['Error creating playlist.']
 
 def removePlaylist():
     global playlistID
@@ -186,4 +239,3 @@ def verifyPremiumStep2(token):
     else:
         print(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
         return(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
-
