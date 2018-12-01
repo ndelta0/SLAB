@@ -9,10 +9,10 @@ import webbrowser as wb
 
 ## MySQL
 database = mysql.connector.connect(
-	host='sql7.freesqldatabase.com',
-    user='sql7267839',
-    passwd='ipqJ8eEIJR',
-    database='sql7267839'
+	host='MrSuitPL.mysql.pythonanywhere-services.com',
+    user='MrSuitPL',
+    passwd='Zabciajest10/10',
+    database='MrSuitPL$sql7267839'
 )
 botCursor = database.cursor()
 
