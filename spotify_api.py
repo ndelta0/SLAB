@@ -255,7 +255,7 @@ def getPlaylist():
 
 def verifyPremiumStep1():
     baseUrl = 'https://accounts.spotify.com/authorize'
-    queryParams = 'client_id={}&response_type=token&redirect_uri=https://march3wqa.github.io/Spotiscord/index.html&scope=user-read-email%20user-read-private%20user-read-birthdate'
+    queryParams = 'client_id={}&response_type=token&redirect_uri=https://march3wqa.github.io/SLAB/index.html&scope=user-read-email%20user-read-private%20user-read-birthdate'
     finalUrl = baseUrl + '?' + queryParams.format(clientID)
     return finalUrl
 
