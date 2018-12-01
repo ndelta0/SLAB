@@ -1,7 +1,7 @@
 ## Imports
 import mysql.connector
 import requests as rq
-
+import os
 import base64
 import json
 import webbrowser as wb
@@ -9,10 +9,10 @@ import webbrowser as wb
 
 ## MySQL
 database = mysql.connector.connect(
-	host='sql7.freesqldatabase.com',
-    user='sql7267839',
-    passwd='ipqJ8eEIJR',
-    database='sql7267839'
+	host=os.environ['db-host'],
+    user=os.environ['db-user'],
+    passwd=os.environ['db-passwd'],
+    database=os.environ['db-dbname']
 )
 botCursor = database.cursor()
 
