@@ -99,7 +99,7 @@ async def on_message(message):
                     await client.send_message(message.channel, 'Cancelled')
                     
         elif message.content.lower().startswith('%screate' % PREF):
-            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.user.id == '312223735505747968') == True:
+            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
                 
                 msg = message.content.lower()
                 msgList = msg.split()
@@ -127,7 +127,7 @@ async def on_message(message):
                 
         elif message.content.lower().startswith('%sdelete' % PREF):
             print('Received command > delete')
-            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.user.id == '312223735505747968') == True:
+            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
                 response = sapi.removePlaylist()
                 
                 if response == 'Deleted successfully.':
@@ -143,7 +143,7 @@ async def on_message(message):
             await client.send_message(message.channel, response)
             
         elif message.content.lower().startswith('%sprefix' % PREF):
-            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.user.id == '312223735505747968') == True:
+            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
                 msg = message.content.lower()
                 msgList = msg.split()
                 msgList.pop(0)
@@ -203,7 +203,7 @@ async def on_message(message):
             await asyncio.sleep(5)
     elif message.content.lower().startswith('%sbind' % PREF):
         print('Received command > bind')
-        if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.user.id == '312223735505747968') == True:
+        if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
             if message.channel.id in boundChannels:
                 await client.send_message(message.channel, 'Already bound')
             else:
