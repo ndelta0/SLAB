@@ -2,3 +2,4 @@ discord.py
 requests
 mysql
 asyncio
+mysql-connector
