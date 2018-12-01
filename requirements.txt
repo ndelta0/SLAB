@@ -1,7 +1,3 @@
-discord.py
-asyncio
-requests
-base64
-json
-webbrowser
-mysql.connector
+discord.py==0.16.12
+requests==2.20.1
+mysql.connector==2.1.6
