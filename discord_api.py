@@ -27,7 +27,6 @@ settingsDict['boundChannels'] = boundChannelsList
 # Variables
 PREF = settingsDict['prefix']
 boundChannels = settingsDict['boundChannels']
-# DISCORDTOKEN = 'NTE2MTY5MTUxODQ1MzY3ODA5.DtvvnQ.3x4uiFEM5OlXrXeqPuMDBIfOtKY'
 DISCORDTOKEN = settingsDict['discordToken']
 # <----->
 
