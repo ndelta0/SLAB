@@ -34,10 +34,15 @@ DISCORDTOKEN = settingsDict['discordToken']
 client = discord.Client()
 
 async def statusChange():
+    suffix = ''
+    if os.environ['bot-build'] == 'dev':
+        suffix = '-dev'
+    elif os.environ['bot-build'] == 'stable':
+        suffix = '-stable'
     await client.wait_until_ready()
     while not client.is_closed:
         while 1:
-            await client.change_presence(game = discord.Game(name='SLAB v0.1'))
+            await client.change_presence(game = discord.Game(name='SLAB v0.2{}'.format(suffix)))
             await asyncio.sleep(15)
             helpStr = 'Type %shelp for help!' % PREF
             await client.change_presence(game = discord.Game(name=helpStr))
@@ -51,12 +56,37 @@ async def on_message(message):
     if message.author == client.user:
         return
     if message.author.bot: return
+    if message.content.lower().startswith('%sbind' % PREF):
+        print('Received command > bind | From {0.author} in {0.server.name}/{0.channel}'.format(message))
+        if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
+            if message.channel.id in boundChannels:
+                await client.send_message(message.channel, 'Already bound')
+            else:
+                boundChannels.append(message.channel.id)
+                sapi.dbUpdateSettings(['boundChannels', ' '.join(boundChannels)])
+                await client.send_message(message.channel, '***Bound to this channel.***')
+                return boundChannels
+        else:
+            await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
     
-    if message.channel.id in boundChannels:
+    if message.content.lower().startswith('%sunbind' % PREF):
+        print('Received command > unbind | From {0.author} in {0.server.name}/{0.channel}'.format(message))
+        if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
+            if message.channel.id not in boundChannels:
+                await client.send_message(message.channel, 'Not binded')
+            else:
+                boundChannels.remove(message.channel.id)
+                sapi.dbUpdateSettings(['boundChannels', ' '.join(boundChannels)])
+                await client.send_message(message.channel, '***Unbound from this channel.***')
+                return boundChannels
+        else:
+            await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
+
+    elif message.channel.id in boundChannels:
         if message.content.lower().startswith('%shello' % PREF):
             msg = 'Hello {0.author.mention}'.format(message)
             await client.send_message(message.channel, msg)
-            print('Received command > hello')
+            print('Received command > hello | From {0.author} in {0.server.name}/{0.channel}'.format(message))
             
         elif message.content.lower().startswith('%ssearch' % PREF):
             msg = message.content.lower()
@@ -68,7 +98,7 @@ async def on_message(message):
                 return
             
             msg = ' '.join(msgList)
-            print('Received command > search >> %s' % msg)
+            print('Received command > search >> {1} | From {0.author} in {0.server.name}/{0.channel}'.format(message, msg))
             # await client.send_message(message.channel, msg)
             response = sapi.searchSong(msg)
             
@@ -81,7 +111,7 @@ async def on_message(message):
             elif response[0] == 0:
                 await client.send_message(message.channel, 'Is this the song you are looking for?')
                 await client.send_message(message.channel, response[1])
-                await client.send_message(message.channel, 'If yes, type \'**!!yes**\', and if not type \'**!!no**\' and specify your search')
+                await client.send_message(message.channel, 'If yes, type \'**{0}yes**\', and if not type \'**{0}no**\' and specify your search'.format(PREF))
                 
                 def agreement(ans):
                     if ans.content.startswith('%syes' % PREF):
@@ -92,11 +122,13 @@ async def on_message(message):
                 ans = await client.wait_for_message(author=message.author, check=agreement, timeout=30)
                 
                 if ans.content == '{}yes'.format(PREF):
-                    await client.send_message(message.channel, 'Adding to playlist')
+                    await client.send_message(message.channel, 'Adding to playlist.')
                     response = sapi.addToPlaylist(response[1])
                     await client.send_message(message.channel, response)
+                elif ans.content == '{}no'.format(PREF):
+                    await client.send_message(message.channel, 'Cancelled.')
                 else:
-                    await client.send_message(message.channel, 'Cancelled')
+                    await client.send_message(message.channel, 'Invalid answer. Cancelling.')
                     
         elif message.content.lower().startswith('%screate' % PREF):
             if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
@@ -110,7 +142,7 @@ async def on_message(message):
                     return
                 
                 msg = ' '.join(msgList)
-                print('Received command > create >> %s' % msg)
+                print('Received command > create >> {1} | From {0.author} in {0.server.name}/{0.channel}'.format(message, msg))
                 response = sapi.createPlaylist(msg)
                 
                 if response[0] == 'Error creating playlist.':
@@ -126,7 +158,7 @@ async def on_message(message):
                 await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
                 
         elif message.content.lower().startswith('%sdelete' % PREF):
-            print('Received command > delete')
+            print('Received command > delete | From {0.author} in {0.server.name}/{0.channel}'.format(message))
             if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
                 response = sapi.removePlaylist()
                 
@@ -138,7 +170,7 @@ async def on_message(message):
                 await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
                 
         elif message.content.lower().startswith('%splaylist' % PREF):
-            print('Received command > playlist')
+            print('Received command > playlist | From {0.author} in {0.server.name}/{0.channel}'.format(message))
             response = sapi.getPlaylist()
             await client.send_message(message.channel, response)
             
@@ -153,7 +185,7 @@ async def on_message(message):
                     return
                 
                 msg = ' '.join(msgList)
-                print('Received command > prefix >> %s' % msg)
+                print('Received command > prefix >> {1} | From {0.author} in {0.server.name}/{0.channel}'.format(message, msg))
                 PREF = msg
                 await client.send_message(message.channel, 'Changed prefix to `%s`' % PREF)
                 sapi.dbUpdateSettings((['prefix', PREF]))
@@ -162,7 +194,7 @@ async def on_message(message):
                 await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
                 
         elif message.content.lower().startswith('%shelp' % PREF):
-            print('Received command > help')
+            print('Received command > help | From {0.author} in {0.server.name}/{0.channel}'.format(message))
             helpEmbed = discord.Embed(
                 color = discord.Color.green()
             )
@@ -175,12 +207,12 @@ async def on_message(message):
             helpEmbed.add_field(name='%screate <name>'%PREF, value='~Not yet available~ Creates playlist with name <name>', inline=True)
             helpEmbed.add_field(name='%sdelete <name>'%PREF, value='~Not yet available~ Deletes playlist with name <name>', inline=True)
             helpEmbed.add_field(name='%sprefix'%PREF, value='Sets new prefix for commands', inline=True)
-            helpEmbed.add_field(name='%sbind'%PREF, value='Binds bot to selected channel', inline=True)
+            helpEmbed.add_field(name='%sbind'%PREF, value='Binds bot to current channel', inline=True)
+            helpEmbed.add_field(name='%sunbind'%PREF, value='Unbinds bot from current channel', inline=True)
             await client.send_message(message.channel, embed=helpEmbed)
 
-
         elif message.content.lower().startswith('%sverify' % PREF):
-            print('Received command > verify')
+            print('Received command > verify | From {0.author} in {0.server.name}/{0.channel}'.format(message))
             serverObj = client.get_server(message.server.id)
             memberObj = message.author
             response = sapi.verifyPremiumStep1()
@@ -188,7 +220,7 @@ async def on_message(message):
             answ = await client.wait_for_message(author=message.author, timeout=60)
             authResponse = sapi.verifyPremiumStep2(answ.content)
             if authResponse == True:
-                await client.send_message(message.author, 'You have premium subscription. You just got \'premium :star:\' role')
+                await client.send_message(message.author, 'You have premium subscription. You just got `PREMIUM ⭐` role')
                 role = discord.utils.get(serverObj.roles, name='PREMIUM ⭐')
                 await client.add_roles(memberObj, role)
             elif authResponse == False:
@@ -196,23 +228,7 @@ async def on_message(message):
             else:
                 await client.send_message(message.author, authResponse)
 
-        elif message.content.lower().startswith('%sdebug' % PREF):
-            print('Received command > debug')
-            clientVar = client
-            serverVar = client.get_server(message.server.id)
-            await asyncio.sleep(5)
-    elif message.content.lower().startswith('%sbind' % PREF):
-        print('Received command > bind')
-        if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
-            if message.channel.id in boundChannels:
-                await client.send_message(message.channel, 'Already bound')
-            else:
-                boundChannels.append(message.channel.id)
-                await client.send_message(message.channel, '***Bound to this channel.***')
-                return boundChannels
-        else:
-            await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
-
+    
 @client.event
 async def on_ready():
     print('Logged in as')
