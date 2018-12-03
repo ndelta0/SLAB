@@ -42,7 +42,7 @@ async def statusChange():
     await client.wait_until_ready()
     while not client.is_closed:
         while 1:
-            await client.change_presence(game = discord.Game(name='SLAB v0.2{}'.format(suffix)))
+            await client.change_presence(game = discord.Game(name='SLAB v0.2.2{}'.format(suffix)))
             await asyncio.sleep(15)
             helpStr = 'Type %shelp for help!' % PREF
             await client.change_presence(game = discord.Game(name=helpStr))
