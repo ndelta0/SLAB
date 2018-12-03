@@ -4,6 +4,7 @@ import mysql.connector
 import asyncio
 import spotify_api as sapi
 import os
+import signal
 
 ## MySQL
 database = mysql.connector.connect(
@@ -31,6 +32,17 @@ boundChannels = settingsDict['boundChannels']
 DISCORDTOKEN = settingsDict['discordToken']
 # <----->
 
+# Classes
+class GracefulKiller:
+    kill_now = False
+    def __init__(self):
+        signal.signal(signal.SIGINT, self.exit_gracefully)
+        signal.signal(signal.SIGTERM, self.exit_gracegully)
+
+    def exit_gracefully(self, signum, frame):
+        self.kill_now = True 
+
+
 client = discord.Client()
 
 async def statusChange():
@@ -56,6 +68,7 @@ async def on_message(message):
     if message.author == client.user:
         return
     if message.author.bot: return
+
     if message.content.lower().startswith('%sbind' % PREF):
         print('Received command > bind | From {0.author} in {0.server.name}/{0.channel}'.format(message))
         if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
@@ -83,18 +96,20 @@ async def on_message(message):
             await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
 
     elif message.channel.id in boundChannels:
+        ### ? Should this even be here?
         if message.content.lower().startswith('%shello' % PREF):
             msg = 'Hello {0.author.mention}'.format(message)
             await client.send_message(message.channel, msg)
             print('Received command > hello | From {0.author} in {0.server.name}/{0.channel}'.format(message))
             
+        ### TODO: Update search to accomodate URI and adding to playlist with name
         elif message.content.lower().startswith('%ssearch' % PREF):
             msg = message.content.lower()
             msgList = msg.split()
             msgList.pop(0)
             
             if msgList == []:
-                await client.send_message(message.channel, ':x:** Proper use:** `%ssearch <query>`' % PREF)
+                await client.send_message(message.channel, ':x:** Proper use:** `%ssearch <query/song URI>`' % PREF)
                 return
             
             msg = ' '.join(msgList)
@@ -111,21 +126,29 @@ async def on_message(message):
             elif response[0] == 0:
                 await client.send_message(message.channel, 'Is this the song you are looking for?')
                 await client.send_message(message.channel, response[1])
-                await client.send_message(message.channel, 'If yes, type \'**{0}yes**\', and if not type \'**{0}no**\' and specify your search'.format(PREF))
+                await client.send_message(message.channel, 'If yes, type `{0}yes <playlist\'s name>` to add to playlist or `{0}no` to cancel'.format(PREF))
                 
                 def agreement(ans):
-                    if ans.content.startswith('%syes' % PREF):
+                    if ans.content.lower().startswith('%syes' % PREF):
                         return('yes')
                     else:
                         return('no')
                     
                 ans = await client.wait_for_message(author=message.author, check=agreement, timeout=30)
                 
-                if ans.content == '{}yes'.format(PREF):
+                if ans.content.lower().startswith('{}yes'.format(PREF)):
+                    plName = ans.content
+                    plName = plName.split()
+                    plName.pop(0)
                     await client.send_message(message.channel, 'Adding to playlist.')
-                    response = sapi.addToPlaylist(response[1])
-                    await client.send_message(message.channel, response)
-                elif ans.content == '{}no'.format(PREF):
+                    addResp = sapi.addToPlaylist(plName, response[2], message.author.id)
+                    if addResp[0] == 0:
+                        await client.send_message(message.channel, 'Successfully added to playlist `{}`'.format(plName))
+                    elif addResp[0] == 1:
+                        await client.send_message(message.channel, 'Unable to add to playlist `{}`'.format(plName))
+                    elif addResp[0] == 2:
+                        await client.send_message(message.channel, 'No playlist named `{}`'.format(plName))
+                elif ans.content.lower().startswith == '{}no'.format(PREF):
                     await client.send_message(message.channel, 'Cancelled.')
                 else:
                     await client.send_message(message.channel, 'Invalid answer. Cancelling.')
@@ -157,7 +180,7 @@ async def on_message(message):
             else:
                 await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
                 
-        elif message.content.lower().startswith('%sdelete' % PREF):
+        elif message.content.lower().startswith('%sdeleteplaylist' % PREF):
             print('Received command > delete | From {0.author} in {0.server.name}/{0.channel}'.format(message))
             if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
                 response = sapi.removePlaylist()
@@ -168,7 +191,8 @@ async def on_message(message):
                     await client.send_message(message.channel, response)
             else:
                 await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
-                
+        
+        ### TODO: Update for accomodating multiple playlists
         elif message.content.lower().startswith('%splaylist' % PREF):
             print('Received command > playlist | From {0.author} in {0.server.name}/{0.channel}'.format(message))
             response = sapi.getPlaylist()

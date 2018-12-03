@@ -1,35 +1,12 @@
 <!DOCTYPE html>
 <html>
-<head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <title>SLAB landing page</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
-<body>
-    <h1>Hello there!</h1>
-    <b>Your token: </b>
-    <script>
-    function getUrlVars() {
-        var vars = {};
-        var parts = window.location.href.replace(/[#&]+([^=&]+)=([^&]*)/gi, function(m,key,value) {
-            vars[key] = value;
-        });
-        return vars;
-    }
-    var token = getUrlVars()["access_token"];
-    var output = "<input type\"text\" value=\"{}\" id=\"tokenBox\">";
-    document.write(output.replace(/{}/, token));
-    document.write("<button onclick=\"copyToken()\">Copy token</button>");
-    function copyToken() {
-        var copyToken = document.getElementById("tokenBox");
-        copyToken.select();
-        document.execCommand("copy");
-        alert("Copied the token. You can now paste it into Discord.");
-    }
-    </script>
-    <br/>
-    <u>Paste this token into you Discord conversation with bot.</u> <b>You can copy the token with this fun button</b><br/>
-    <i>By the way, thanks for using SLAB!</i>
-</body>
+    <head>
+    <title>U sure?</title>
+    </head>
+    <body>
+    <h1>Oh hi mark!</h1>
+    <b>Are you sure this is where you want to be?</b><br/>
+    <a href='CODE_OF_CONDUCT.md'>Here if code of conduct</a>
+    <a href='https://github.com/March3wQa/SLAB'>And here is GitHub page</a>
+    </body>
 </html>

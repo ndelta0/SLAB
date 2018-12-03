@@ -62,6 +62,7 @@ def dbUpdateSettings(*parameters):
 	botCursor.execute(sql)
 	database.commit()
 
+### * Add delete song functionality
 def dbUpdatePlaylists(action, name = None, url = None, ID = None, user = None):
 	global playlistsList
 	if action == 'create':
@@ -101,8 +102,8 @@ def tokenSwap():
 	global clientID
 	global clientSecret
 
-	# wb.open('https://accounts.spotify.com/authorize?client_id=d3df69ad53ad4fe0afe621a68a2e852b&response_type=code&redirect_uri=https://march3wqa.github.io/Spotiscord/index.html&scope=playlist-modify-public', new=2)
-	print('https://accounts.spotify.com/authorize?client_id=d3df69ad53ad4fe0afe621a68a2e852b&response_type=code&redirect_uri=https://march3wqa.github.io/Spotiscord/index.html&scope=playlist-modify-public')
+	# wb.open('https://accounts.spotify.com/authorize?client_id=d3df69ad53ad4fe0afe621a68a2e852b&response_type=code&redirect_uri=https://march3wqa.github.io/SLAB/oauth/tokenswap/index.html&scope=playlist-modify-public', new=2)
+	print('https://accounts.spotify.com/authorize?client_id=d3df69ad53ad4fe0afe621a68a2e852b&response_type=code&redirect_uri=https://march3wqa.github.io/SLAB/oauth/tokenswap/index.html&scope=playlist-modify-public')
 	apiCode = input('Code >> ')
 
 	authKey = clientID + ':' + clientSecret
@@ -110,7 +111,7 @@ def tokenSwap():
 	authKeyBytes = base64.b64encode(authKeyBytes)
 	authKey = bytes.decode(authKeyBytes)
 	authHeader = {'Authorization': 'Basic '+ authKey}
-	dataBody = {'grant_type': 'authorization_code', 'code': apiCode, 'redirect_uri': 'https://march3wqa.github.io/Spotiscord/index.html'}
+	dataBody = {'grant_type': 'authorization_code', 'code': apiCode, 'redirect_uri': 'https://march3wqa.github.io/SLAB/oauth/tokenswap/index.html'}
 
 	resp = rq.post(url = 'https://accounts.spotify.com/api/token', data = dataBody, headers = authHeader)
 	respJson = resp.json()
@@ -152,28 +153,33 @@ def tokenRefresh():
 		print(respJson['error'] + ' >> ' + respJson['error_description'])
 		tokenSwap()
 
-def searchSong(q, market = 'PL'):
-	query = q.replace(' ', '%20')
-	params = {'q': query, 'type': 'track', 'limit': 1, 'offset': 0, 'market': market}
-	# headers = header
-	# headerUpdate = {'Accept': 'application/json', 'Content-Type': 'application/json'}
-	# headers.update(headerUpdate)
-	url = 'https://api.spotify.com/v1/search?'
-	url = url+'q='+params['q']+'&type='+params['type']+'&limit='+str(params['limit'])+'&offset='+str(params['offset'])+'&market='+params['market']
+### /TODO/: Add search by URI
+def searchSong(q):
+	if q[:14] == 'spotify:track:':
+		query = q.split(':')
+		query = query[2]
+		url = 'https://api.spotify.com/v1/tracks/{}'.format(query)
+		qType = 'uri'
+	else:
+		query = q.replace(' ', '%20')
+		params = {'q': query, 'type': 'track', 'limit': 1}
+		url = 'https://api.spotify.com/v1/search?'
+		url = url+'q='+params['q']+'&type='+params['type']+'&limit='+str(params['limit'])
+		qType = 'normal'
 	resp = rq.get(url = url, headers = header)
 	respJson = resp.json()
 	if resp.status_code == 200:
 		if respJson['tracks']['items'] == []:
-			if market == 'US':
-				return searchSong(q, 'GB')
-			elif market == 'GB':
-				return([2])
-			else:
-				return searchSong(q, 'US')
+			return([2])
 		else:
-			trackURL = respJson['tracks']['items'][0]['external_urls']['spotify']
-			trackURI = respJson['tracks']['items'][0]['uri']
-			return(0, trackURL, trackURI)
+			if qType == 'normal':
+				trackURL = respJson['tracks']['items'][0]['external_urls']['spotify']
+				trackURI = respJson['tracks']['items'][0]['uri']
+				return(0, trackURL, trackURI)
+			elif qType == 'uri':
+				trackURL = respJson['external_urls']['spotify']
+				trackURI = respJson['uri']
+				return(0, trackURL, trackURI)
 	else:
 		if resp.status_code == 401:
 			print(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
@@ -241,13 +247,13 @@ def addToPlaylist(playlistName, uri, user):
 	else:
 		return(2)
 
-def getPlaylist():
-	global playlistURL
-	return playlistURL
+### TODO: Get playlist by name
+def getPlaylist(name):
+	pass
 
 def verifyPremiumStep1():
 	baseUrl = 'https://accounts.spotify.com/authorize'
-	queryParams = 'client_id={}&response_type=token&redirect_uri=https://march3wqa.github.io/SLAB/index.html&scope=user-read-private'
+	queryParams = 'client_id={}&response_type=token&redirect_uri=https://march3wqa.github.io/SLAB/oauth/token/index.html&scope=user-read-private'
 	finalUrl = baseUrl + '?' + queryParams.format(clientID)
 	return finalUrl
 
@@ -263,3 +269,6 @@ def verifyPremiumStep2(token):
 	else:
 		print(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
 		return(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
+
+if __name__ == "__main__":
+	tokenSwap()
