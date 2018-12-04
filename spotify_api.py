@@ -5,6 +5,8 @@ import os
 import base64
 import json
 import webbrowser as wb
+import logging
+import asyncio
 
 
 ## MySQL
@@ -43,6 +45,13 @@ for i in range(len(playlists)):
 	playlistsList.append(playlistDict)
 
 ## Variables
+logger = logging.getLogger('SpotifyAPI')
+logger.setLevel(logging.INFO)
+ch = logging.StreamHandler()
+ch.setLevel(logging.INFO)
+formatter = logging.Formatter('%(name)s || %(levelname)s: %(message)s')
+ch.setFormatter(formatter)
+logger.addHandler(ch)
 accessToken = settingsDict['spotifyAccessToken']
 refreshToken = settingsDict['spotifyRefreshToken']
 clientID = settingsDict['spotifyCliendID']
@@ -50,7 +59,7 @@ clientSecret = settingsDict['spotifyClientSecret']
 header = {'Authorization': 'Bearer '+ accessToken}
 
 ## Functions
-def dbUpdateSettings(*parameters):
+async def dbUpdateSettings(*parameters):
 	parametersStr = ''
 	for i in range(len(parameters)):
 		parametersStr = parametersStr + parameters[i][0] + ' = \'' + parameters[i][1] + '\''
@@ -63,7 +72,7 @@ def dbUpdateSettings(*parameters):
 	database.commit()
 
 ### * Add delete song functionality
-def dbUpdatePlaylists(action, name = None, url = None, ID = None, user = None):
+async def dbUpdatePlaylists(action, name = None, url = None, ID = None, user = None):
 	global playlistsList
 	if action == 'create':
 		sql = 'INSERT INTO playlists (name, url, id) VALUES (\'%s\', \'%s\', \'%s\')' % (name, url, ID)
@@ -98,7 +107,7 @@ def dbUpdatePlaylists(action, name = None, url = None, ID = None, user = None):
 		playlistsList.append(playlistDict)
 	return playlistsList
 
-def tokenSwap():
+async def tokenSwap():
 	global clientID
 	global clientSecret
 
@@ -126,10 +135,10 @@ def tokenSwap():
 		dbUpdateSettings(['spotifyAccessToken', accessToken], ['spotifyRefreshToken', refreshToken])
 		return accessToken, refreshToken, header
 	else:
-		print(respJson['error'] + ' >> ' + respJson['error_description'])
+		logger.critical((respJson['error'] + ' >> ' + respJson['error_description']))
 		return('Something went terribly wrong')
 	
-def tokenRefresh(): 
+async def tokenRefresh(): 
 	global accessToken
 	global refreshToken
 
@@ -150,16 +159,16 @@ def tokenRefresh():
 		dbUpdateSettings(['spotifyAccessToken', accessToken])
 		return accessToken, header
 	else:
-		print(respJson['error'] + ' >> ' + respJson['error_description'])
-		tokenSwap()
+		logger.error((respJson['error'] + ' >> ' + respJson['error_description']))
+		await tokenSwap()
 
 ### /TODO/: Add search by URI
-def searchSong(q):
+async def searchSong(q):
 	if q[:14] == 'spotify:track:':
 		query = q.split(':')
 		query = query[2]
 		url = 'https://api.spotify.com/v1/tracks/{}'.format(query)
-		qType = 'uri'
+		qType = 'id'
 	else:
 		query = q.replace(' ', '%20')
 		params = {'q': query, 'type': 'track', 'limit': 1}
@@ -169,25 +178,34 @@ def searchSong(q):
 	resp = rq.get(url = url, headers = header)
 	respJson = resp.json()
 	if resp.status_code == 200:
-		if respJson['tracks']['items'] == []:
-			return([2])
-		else:
-			if qType == 'normal':
+		if qType == 'normal':
+			if respJson['tracks']['items'] == []:
+				return([2])
+			else:
 				trackURL = respJson['tracks']['items'][0]['external_urls']['spotify']
-				trackURI = respJson['tracks']['items'][0]['uri']
-				return(0, trackURL, trackURI)
-			elif qType == 'uri':
-				trackURL = respJson['external_urls']['spotify']
-				trackURI = respJson['uri']
-				return(0, trackURL, trackURI)
+				trackID = respJson['tracks']['items'][0]['id']
+				return(0, trackURL, trackID)
+		elif qType == 'id':
+			trackURL = respJson['external_urls']['spotify']
+			trackID = respJson['id']
+			return(0, trackURL, trackID)
 	else:
 		if resp.status_code == 401:
-			print(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
-			print('~~ Trying to get new token and retry search')
-			tokenRefresh()
-			return searchSong(q)
+			logger.error((str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
+			logger.warning(('~~ Trying to get new token and retry search'))
+			await tokenRefresh()
+			return await searchSong(q)
+		elif resp.status_code == 400:
+			logger.error((str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
+			if respJson['error']['message'] == 'invalid id':
+				return([3])
+			logger.warning(('~~ Trying to get new token pair and retry search'))
+			await tokenSwap()
+			return await searchSong(q)
+		elif resp.status_code == 404:
+			return([4])
 		else:
-			print(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
+			logger.error((str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
 			return([1])
 
 def createPlaylist(name):
@@ -206,7 +224,7 @@ def createPlaylist(name):
 		playlistsList = dbUpdatePlaylists('create', name, playlistURL, playlistID)
 		return playlistsList
 	else:
-		print(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
+		logger.error((str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
 		return ['Error creating playlist.']
 
 def removePlaylist(name):
@@ -223,17 +241,17 @@ def removePlaylist(name):
 		return('Deleted successfully.')
 	else:
 		respJson = resp.json()
-		print(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
+		logger.error((str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
 		return('Unable to delete playlist.')
 
-def addToPlaylist(playlistName, uri, user):
+def addToPlaylist(playlistName, id, user):
 	global playlistsList
 	if any(d['name'] == playlistName for d in playlistsList):
 		for i in len(playlistsList):
 					if playlistsList[i]['name'] == playlistName:
 						playlistID = playlistsList[i]['id']
 		url = 'https://api.spotify.com/v1/playlists/%s/tracks' % playlistID
-		params = {'uris': uri}
+		params = {'uris': 'spotify:track:{}'.format(id)}
 		resp = rq.post(url = url, params = params, headers = header)
 
 		if resp.status_code == 201:
@@ -242,7 +260,7 @@ def addToPlaylist(playlistName, uri, user):
 			return(0, playlistsList)
 		else:
 			respJson = resp.json()
-			print(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
+			logger.error((str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
 			return(1)
 	else:
 		return(2)
@@ -267,8 +285,5 @@ def verifyPremiumStep2(token):
 		else:
 			return False
 	else:
-		print(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
+		logger.error((str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
 		return(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
-
-if __name__ == "__main__":
-	tokenSwap()
