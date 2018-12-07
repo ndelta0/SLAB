@@ -71,7 +71,8 @@ async def dbUpdateSettings(*parameters):
 	botCursor.execute(sql)
 	database.commit()
 
-### * Add delete song functionality
+### TODO: Add delete song functionality
+### /TODO/: Add delete playlist functionality
 async def dbUpdatePlaylists(action, name = None, url = None, ID = None, user = None):
 	global playlistsList
 	if action == 'create':
@@ -82,14 +83,19 @@ async def dbUpdatePlaylists(action, name = None, url = None, ID = None, user = N
 		if user == None:
 			sql = 'UPDATE playlists SET users = \'%s\' WHERE name = \'%s\'' % (user, name)
 		else:
-			for i in len(playlistsList):
+			for i in range(len(playlistsList)):
 				if playlistsList[i]['name'] == name:
 					currUsers = playlistsList[i]['users']
+					if currUsers == None: currUsers = []
 					currUsers.append(user)
 					currUsersStr = ' '.join(currUsers)
 					sql = 'UPDATE playlists SET users = \'%s\' WHERE name = \'%s\'' % (currUsersStr, name)
 		botCursor.execute(sql)
-		botCursor.commit()
+		database.commit()
+	elif action == 'delplaylist':
+		sql = 'DELETE FROM playlists WHERE name = \'%s\'' % name
+		botCursor.execute(sql)
+		database.commit()
 	else:
 		return(1)
 	botCursor.execute('SELECT * FROM playlists')
@@ -101,9 +107,10 @@ async def dbUpdatePlaylists(action, name = None, url = None, ID = None, user = N
 		for k in range(len(playlists[i])):
 			extendDict = {fields[k]: playlists[i][k]}
 			playlistDict.update(extendDict)
-		users = playlistDict['users']
-		usersList = users.split()
-		playlistDict['users'] = usersList
+		if not playlistDict['users'] == None:
+			users = playlistDict['users']
+			usersList = users.split()
+			playlistDict['users'] = usersList
 		playlistsList.append(playlistDict)
 	return playlistsList
 
@@ -156,13 +163,12 @@ async def tokenRefresh():
 		global header
 		accessToken = respJson['access_token']
 		header['Authorization'] = 'Bearer '+ accessToken
-		dbUpdateSettings(['spotifyAccessToken', accessToken])
+		await dbUpdateSettings(['spotifyAccessToken', accessToken])
 		return accessToken, header
 	else:
 		logger.error((respJson['error'] + ' >> ' + respJson['error_description']))
 		await tokenSwap()
 
-### /TODO/: Add search by URI
 async def searchSong(q):
 	if q[:14] == 'spotify:track:':
 		query = q.split(':')
@@ -192,7 +198,7 @@ async def searchSong(q):
 	else:
 		if resp.status_code == 401:
 			logger.error((str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
-			logger.warning(('~~ Trying to get new token and retry search'))
+			logger.warning(('~~ Trying to get new token and retry search ~~'))
 			await tokenRefresh()
 			return await searchSong(q)
 		elif resp.status_code == 400:
@@ -208,54 +214,78 @@ async def searchSong(q):
 			logger.error((str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
 			return([1])
 
-def createPlaylist(name):
-	dataPost = '{\"name\": \"%s\"}' % name
-	customHeader = header
-	headerAdditional = {'Content-Type': 'application/json'}
-	customHeader.update(headerAdditional)
+async def createPlaylist(name):
+	global playlistsList
+	try:
+		name.encode('ascii')
+	except Exception as err:
+		return([3])
+	if not any(d['name'] == name for d in playlistsList):
+		dataPost = '{\"name\": \"%s\"}' % name
+		customHeader = header
+		headerAdditional = {'Content-Type': 'application/json'}
+		customHeader.update(headerAdditional)
 
-	resp = rq.post(url = 'https://api.spotify.com/v1/users/11172683931/playlists', data = dataPost, headers = customHeader)
-	respJson = resp.json()
+		resp = rq.post(url = 'https://api.spotify.com/v1/users/kyw80vp7fz3h6qrq4velkdmm8/playlists', data = dataPost, headers = customHeader)
+		respJson = resp.json()
 
-	if resp.status_code == 200 or resp.status_code == 201:
-		global playlistsList
-		playlistID = respJson['id']
-		playlistURL = respJson['external_urls']['spotify']
-		playlistsList = dbUpdatePlaylists('create', name, playlistURL, playlistID)
-		return playlistsList
+		if resp.status_code == 200 or resp.status_code == 201:
+			playlistID = respJson['id']
+			playlistURL = respJson['external_urls']['spotify']
+			playlistsList = await dbUpdatePlaylists('create', name, playlistURL, playlistID)
+			return ([0, playlistURL, playlistsList])
+		elif resp.status_code == 401:
+			logger.error((str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
+			logger.warning(('~~ Trying to get new token and retry creating ~~'))
+			await tokenRefresh()
+			return await createPlaylist(name)
+		else:
+			logger.error((str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
+			return ([1])
 	else:
-		logger.error((str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
-		return ['Error creating playlist.']
+		return ([2])
 
-def removePlaylist(name):
-	global playlistID
-	global playlistURL
+async def removePlaylist(name):
+	global playlistsList
+	try:
+		name.encode('ascii')
+	except Exception as err:
+		return([3])
+	if any(d['name'] == name for d in playlistsList):
+		for item in playlistsList:
+			if item['name'] == name:
+				playlistID = item['id']
+				break
+	else:
+		return([2])
 	url = 'https://api.spotify.com/v1/playlists/%s/followers' % playlistID
 	resp = rq.delete(url = url, headers = header)
-
 	if resp.status_code == 200:
-		playlists = {'playlist_url': 'none', 'playlist_id': 'none'}
-		playlistsJson = json.dumps(playlists)
-		with open('playlists.json', 'w') as f:
-			json.dump(playlistsJson, f)
-		return('Deleted successfully.')
+		await dbUpdatePlaylists(action = 'delplaylist', name = name)
+		return([0])
+	elif resp.status_code == 401:
+		respJson = resp.json()
+		logger.error((str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
+		logger.warning(('~~ Trying to get new token and retry search ~~'))
+		await tokenRefresh()
+		return await removePlaylist(name)
 	else:
 		respJson = resp.json()
 		logger.error((str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
-		return('Unable to delete playlist.')
+		return([1])
 
-def addToPlaylist(playlistName, id, user):
+async def addToPlaylist(playlistName, id, user):
 	global playlistsList
 	if any(d['name'] == playlistName for d in playlistsList):
-		for i in len(playlistsList):
-					if playlistsList[i]['name'] == playlistName:
-						playlistID = playlistsList[i]['id']
+		for item in playlistsList:
+					if item['name'] == playlistName:
+						playlistID = item['id']
 		url = 'https://api.spotify.com/v1/playlists/%s/tracks' % playlistID
 		params = {'uris': 'spotify:track:{}'.format(id)}
 		resp = rq.post(url = url, params = params, headers = header)
 
 		if resp.status_code == 201:
-			playlistsList = dbUpdatePlaylists('update', name=playlistName, user=user)
+			playlistsList = await dbUpdatePlaylists('update', name=playlistName, user=user)
 
 			return(0, playlistsList)
 		else:
@@ -265,17 +295,54 @@ def addToPlaylist(playlistName, id, user):
 	else:
 		return(2)
 
-### TODO: Get playlist by name
-def getPlaylist(name):
-	pass
+async def getPlaylists():
+	global playlistsList
+	if len(playlistsList) == 0:
+		return([2])
+	try:
+		playReturn = []
+		for item in playlistsList:
+			playReturn.extend([[item['name'], item['url']]])
+		return([0, playReturn])
+	except Exception as err:
+		logger.error('Error getting playlists')
+		return([1])
+	
+async def removeSong(URI, playlistName):
+	global playlistsList
+	try:
+		playlistName.encode('ascii')
+	except Exception as err:
+		return([3])
+	if len(playlistsList) == 0:
+		return([2])
+	if any(d['name'] == playlistName for d in playlistsList):
+		for item in playlistsList:
+			if item['name'] == playlistName:
+				playlistID = item['id']
+				break
+	else:
+		return([4])
+	customHeader = header
+	customHeader.update({'Content-Type': 'application/json'})
+	jsonBody = '{\'tracks\': [{\'uri\': \'%s\'}]}'
+	url = 'https://api.spotify.com/v1/playlists/{}/tracks'.format(playlistID)
+	resp = rq.delete(url=url, headers=customHeader, data=jsonBody)
 
-def verifyPremiumStep1():
+	if resp.status_code == 200:
+		return([0])
+	else:
+		respJson = resp.json()
+		logger.error((str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
+		return([1])
+
+async def verifyPremiumStep1():
 	baseUrl = 'https://accounts.spotify.com/authorize'
 	queryParams = 'client_id={}&response_type=token&redirect_uri=https://march3wqa.github.io/SLAB/oauth/token/index.html&scope=user-read-private'
 	finalUrl = baseUrl + '?' + queryParams.format(clientID)
 	return finalUrl
 
-def verifyPremiumStep2(token):
+async def verifyPremiumStep2(token):
 	authHeader = {'Authorization': 'Bearer ' + token}
 	resp = rq.get(url='https://api.spotify.com/v1/me', headers=authHeader)
 	respJson = resp.json()
@@ -287,3 +354,20 @@ def verifyPremiumStep2(token):
 	else:
 		logger.error((str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
 		return(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
+
+async def getPlaylist(name):
+	global playlistsList
+	try:
+		name.encode('ascii')
+	except Exception as err:
+		return([3])
+	if len(playlistsList) == 0:
+		return([2])
+	if any(d['name'] == name for d in playlistsList):
+		for item in playlistsList:
+			if item['name'] == name:
+				playlistURL = item['url']
+				break
+		return([0, playlistURL])
+	else:
+		return([1])

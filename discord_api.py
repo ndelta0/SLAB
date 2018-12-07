@@ -6,6 +6,7 @@ from spotify_api import *
 import os
 import logging
 import threading
+import signal
 
 ## MySQL
 database = mysql.connector.connect(
@@ -27,7 +28,8 @@ boundChannelsStr = settingsDict['boundChannels']
 boundChannelsList = boundChannelsStr.split()
 settingsDict['boundChannels'] = boundChannelsList
 
-# Variables
+# Variables & classes
+stopCode = False
 logger = logging.getLogger('DiscordAPI')
 logger.setLevel(logging.INFO)
 ch = logging.StreamHandler()
@@ -42,6 +44,11 @@ DISCORDTOKEN = settingsDict['discordToken']
 
 client = discord.Client()
 
+def sigterm_handler(signal, frame):
+    client.close()
+    stopCode = True
+signal.signal(signal.SIGTERM, sigterm_handler)
+
 async def statusChange():
     global statusRun
     if os.environ['bot-build'] == 'dev':
@@ -50,7 +57,7 @@ async def statusChange():
         suffix = '-stable'
     await client.wait_until_ready()
     while 1:
-        await client.change_presence(game = discord.Game(name='SLAB v0.3{}'.format(suffix)))
+        await client.change_presence(game = discord.Game(name='SLAB v1{}'.format(suffix)))
         await asyncio.sleep(15)
         helpStr = 'Type %shelp for help!' % PREF
         await client.change_presence(game = discord.Game(name=helpStr))
@@ -58,6 +65,7 @@ async def statusChange():
 
 @client.event
 async def on_message(message):
+    await client.wait_until_login()
     global PREF
     global boundChannels
     
@@ -98,7 +106,6 @@ async def on_message(message):
             await client.send_message(message.channel, msg)
             logger.info(('Received command > hello | From {0.author} in {0.server.name}/{0.channel}'.format(message)))
             
-        ### TODO: Update search to accomodate URI and adding to playlist with name
         elif message.content.lower().startswith('%ssearch' % PREF):
             msg = message.content
             msgList = msg.split()
@@ -142,8 +149,9 @@ async def on_message(message):
                     plName = ans.content
                     plName = plName.split()
                     plName.pop(0)
+                    plName = ''.join(plName)
                     await client.send_message(message.channel, 'Adding to playlist.')
-                    addResp = sapi.addToPlaylist(plName, response[2], message.author.id)
+                    addResp = await addToPlaylist(plName, response[2], message.author.id)
                     if addResp[0] == 0:
                         await client.send_message(message.channel, 'Successfully added to playlist `{}`'.format(plName))
                     elif addResp[0] == 1:
@@ -155,7 +163,7 @@ async def on_message(message):
                 else:
                     await client.send_message(message.channel, 'Invalid answer. Cancelling.')
                     
-        elif message.content.lower().startswith('%screate' % PREF):
+        elif message.content.lower().startswith('%screateplaylist' % PREF):
             if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
                 
                 msg = message.content.lower()
@@ -163,42 +171,72 @@ async def on_message(message):
                 msgList.pop(0)
                 
                 if msgList == []:
-                    await client.send_message(message.channel, ':x:** Proper use:** `%screate <playlist name>`' % PREF)
+                    await client.send_message(message.channel, ':x:** Proper use:** `%screateplaylist <playlist name>`' % PREF)
                     return
                 
                 msg = ' '.join(msgList)
                 logger.info(('Received command > create >> {1} | From {0.author} in {0.server.name}/{0.channel}'.format(message, msg)))
-                response = sapi.createPlaylist(msg)
+                response = await createPlaylist(msg)
                 
-                if response[0] == 'Error creating playlist.':
-                    await client.send_message(message.channel, response[0])
+                if response[0] == 1:
+                    await client.send_message(message.channel, 'Error creating playlist.')
                     
-                elif response[0] == 'Playlist already exists.':
-                    await client.send_message(message.channel, response[0])
+                elif response[0] == 2:
+                    await client.send_message(message.channel, 'Playlist with that name already exists.')
+                
+                elif response[0] == 3:
+                    await client.send_message(message.channel, 'Invalid character(s). Remove or replace any non-ascii characters.')
                     
-                elif response[0] != 'Error creating playlist.' or 'Playlist already exists.':
-                    await client.send_message(message.channel, response[0])
-                    await client.send_message(message.channel, response[1]['playlist_url'])
+                elif response[0] == 0:
+                    await client.send_message(message.channel, 'Successfully created playlist `{}`'.format(msg))
+                    await client.send_message(message.channel, response[1])
             else:
                 await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
                 
         elif message.content.lower().startswith('%sdeleteplaylist' % PREF):
-            logger.info(('Received command > delete | From {0.author} in {0.server.name}/{0.channel}'.format(message)))
+            msg = message.content.lower()
+            msgList = msg.split()
+            msgList.pop(0)
+            
+            if msgList == []:
+                await client.send_message(message.channel, ':x:** Proper use:** `%sdeleteplaylist <playlist name>`' % PREF)
+                return
+            
+            msg = ' '.join(msgList)
+            logger.info(('Received command > delete >> {1} | From {0.author} in {0.server.name}/{0.channel}'.format(message, msg)))
             if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
-                response = sapi.removePlaylist()
+
+                response = await removePlaylist(msg)
                 
-                if response == 'Deleted successfully.':
-                    await client.send_message(message.channel, response)
-                else:
-                    await client.send_message(message.channel, response)
+                if response[0] == 1:
+                    await client.send_message(message.channel, 'Error deleting playlist.')
+                    
+                elif response[0] == 2:
+                    await client.send_message(message.channel, 'No playlist with that name.')
+                
+                elif response[0] == 3:
+                    await client.send_message(message.channel, 'Invalid character(s). Remove or replace any non-ascii characters.')
+                    
+                elif response[0] == 0:
+                    await client.send_message(message.channel, 'Successfully deleted playlist `{}`'.format(msg))
             else:
                 await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
         
-        ### TODO: Update for accomodating multiple playlists
-        elif message.content.lower().startswith('%splaylist' % PREF):
-            logger.info(('Received command > playlist | From {0.author} in {0.server.name}/{0.channel}'.format(message)))
-            response = sapi.getPlaylist()
-            await client.send_message(message.channel, response)
+        elif message.content.lower().startswith('%splaylists' % PREF):
+            logger.info(('Received command > playlists | From {0.author} in {0.server.name}/{0.channel}'.format(message)))
+            response = await getPlaylists()
+            if response[0] == 1:
+                await client.send_message(message.channel, 'Error getting playlists.')
+            if response[0] == 2:
+                await client.send_message(message.channel, 'No playlists.')
+            elif response[0] == 0:
+                user = await client.get_user_info('312223735505747968')
+                playlistsEmbed = discord.Embed(color=discord.Color.green())
+                playlistsEmbed.set_author(name='SLAB playlists', icon_url=client.connection.user.avatar_url)
+                for item in response[1]:
+                    playlistsEmbed.add_field(name=item[0], value=item[1], inline=True)
+                playlistsEmbed.set_footer(text='Made with 💖 by {0.name}#{0.discriminator}'.format(user), icon_url=user.avatar_url)
+                await client.send_message(message.channel, embed=playlistsEmbed)
             
         elif message.content.lower().startswith('%sprefix' % PREF):
             if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
@@ -228,25 +266,26 @@ async def on_message(message):
             helpEmbed.set_author(name='SLAB Help', icon_url=client.connection.user.avatar_url)
             helpEmbed.add_field(name='%shelp'%PREF, value='Shows this help', inline=True)
             helpEmbed.add_field(name='%sverify'%PREF, value='Allows you to obtain Premium:star: role', inline=False)
-            helpEmbed.add_field(name='%ssearch <query>'%PREF, value='~Not yet available~ Allows you to search for a song to add to playlist', inline=False)
-            helpEmbed.add_field(name='%splaylists'%PREF, value='~Not yet available~ Shows list of available playlists', inline=True)
-            helpEmbed.add_field(name='%splaylist <name>'%PREF, value='~Not yet available~ Shows the requested playlist', inline=True)
-            helpEmbed.add_field(name='%screate <name>'%PREF, value='~Not yet available~ Creates playlist with name <name>', inline=True)
-            helpEmbed.add_field(name='%sdelete <name>'%PREF, value='~Not yet available~ Deletes playlist with name <name>', inline=True)
-            helpEmbed.add_field(name='%sprefix'%PREF, value='Sets new prefix for commands', inline=True)
+            helpEmbed.add_field(name='%ssearch <query>'%PREF, value='Allows you to search for a song to add to playlist', inline=True)
+            helpEmbed.add_field(name='%sdelete <uri> <playlist>'%PREF, value='Deletes song with <uri> from <playlist>', inline=True)
+            helpEmbed.add_field(name='%splaylists'%PREF, value='Shows list of available playlists', inline=True)
+            helpEmbed.add_field(name='%splaylist <name>'%PREF, value='Shows the requested playlist', inline=True)
+            helpEmbed.add_field(name='%screateplaylist <name>'%PREF, value='Creates playlist with name <name>', inline=True)
+            helpEmbed.add_field(name='%sdeleteplaylist <name>'%PREF, value='Deletes playlist with name <name>', inline=True)
+            helpEmbed.add_field(name='%sprefix <prefix>'%PREF, value='Sets new <prefix> for commands', inline=True)
             helpEmbed.add_field(name='%sbind'%PREF, value='Binds bot to current channel', inline=True)
             helpEmbed.add_field(name='%sunbind'%PREF, value='Unbinds bot from current channel', inline=True)
-            helpEmbed.set_footer(text='Made with 💖 by {0.name}'.format(user), icon_url=user.avatar_url)
+            helpEmbed.set_footer(text='Made with 💖 by {0.name}#{0.discriminator}'.format(user), icon_url=user.avatar_url)
             await client.send_message(message.channel, embed=helpEmbed)
 
         elif message.content.lower().startswith('%sverify' % PREF):
             logger.info(('Received command > verify | From {0.author} in {0.server.name}/{0.channel}'.format(message)))
             serverObj = client.get_server(message.server.id)
             memberObj = message.author
-            response = sapi.verifyPremiumStep1()
+            response = await verifyPremiumStep1()
             await client.send_message(message.author, ('To verify the account go to the following page and paste in the token:\n' + response))
-            answ = await client.wait_for_message(author=message.author, timeout=60)
-            authResponse = sapi.verifyPremiumStep2(answ.content)
+            answ = await client.wait_for_message(author=message.author, timeout=600)
+            authResponse = await verifyPremiumStep2(answ.content)
             if authResponse == True:
                 await client.send_message(message.author, 'You have premium subscription. You just got `PREMIUM ⭐` role')
                 role = discord.utils.get(serverObj.roles, name='PREMIUM ⭐')
@@ -256,15 +295,81 @@ async def on_message(message):
             else:
                 await client.send_message(message.author, authResponse)
 
+        elif message.content.lower().startswith('%sdelete' % PREF):
+            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
+                msg = message.content
+                msgList = msg.split()
+                msgList.pop(0)
+                
+                if msgList == []:
+                    await client.send_message(message.channel, ':x:** Proper use:** `%sdelete <song URI> <playlist name>`' % PREF)
+                    return
+                
+                playlistName = ' '.join(msg[1:])
+                logger.info(('Received command > delete >> {1} - {2}| From {0.author} in {0.server.name}/{0.channel}'.format(message, msg[0], playlistName)))
+                response = await removeSong(msg[0], playlistName)
+
+                if response[0] == 1:
+                    await client.send_message(message.channel, 'Error deleting song.')
+                elif response[0] == 2:
+                    await client.send_message(message.channel, 'No playlists')
+                elif response[0] == 3:
+                    await client.send_message(message.channel, 'Invalid character(s). Remove or replace any non-ascii characters.')
+                elif response[0] == 4:
+                    await client.send_message(message.channel, 'No playlists with name `{}`'.format(msg[0]))
+                elif response[0] == 0:
+                    await client.send_message(message.channel, 'Song successfully removed.')
+            else:
+                await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
+
+        elif message.content.lower().startswith('%splaylist' % PREF):
+            msg = message.content.lower()
+            msgList = msg.split()
+            msgList.pop(0)
+            
+            if msgList == []:
+                await client.send_message(message.channel, ':x:** Proper use:** `%splaylist <playlist\'s name>`' % PREF)
+                return
+            
+            msg = ' '.join(msgList)
+            logger.info(('Received command > playlist >> {1} | From {0.author} in {0.server.name}/{0.channel}'.format(message, msg)))
+
+            response = await getPlaylist(msg)
+
+            if response[0] == 1:
+                await client.send_message(message.channel, 'Something went wrong.')
+            elif response[0] == 2:
+                await client.send_message(message.channel, 'No playlists.')
+            elif response[0] == 3:
+                await client.send_message(message.channel, 'Invalid character(s). Remove or replace any non-ascii characters.')
+            elif response[0] == 0:
+                await client.send_message(message.channel, response[1])
+
 @client.event
 async def on_ready():
-    logger.info(('Logger in as:'))
+    logger.info(('Logging in as:'))
     logger.info((client.user.name))
     logger.info((client.user.id))
     logger.info(('------'))
 
+@client.event
+async def on_resumed():
+    logger.info('Reconnected')
 
 if __name__ == "__main__":
     logger.info(('Starting code...'))
     client.loop.create_task(statusChange())
-    client.loop.run_until_complete(client.start(DISCORDTOKEN))
+    while True:
+        try:
+            client.loop.run_until_complete(client.start(DISCORDTOKEN))
+        except KeyboardInterrupt as err:
+            logger.info('Stopping code...')
+            stopCode = True
+            client.logout()
+            logger.info('Stopped code')
+        except Exception as err:
+            logger.critical('Exception occurred: {} '.format(err))
+            logger.info('Trying to reconnect...')
+            client.login(DISCORDTOKEN)
+        if stopCode: break
+        
