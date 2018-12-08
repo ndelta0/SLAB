@@ -87,7 +87,7 @@ async def on_message(message):
                 await client.send_message(message.channel, 'Already bound')
             else:
                 boundChannels.append(message.channel.id)
-                sapi.dbUpdateSettings(
+                await dbUpdateSettings(
                     ['boundChannels', ' '.join(boundChannels)])
                 await client.send_message(message.channel, '***Bound to this channel.***')
                 return boundChannels
@@ -102,7 +102,7 @@ async def on_message(message):
                 await client.send_message(message.channel, 'Not binded')
             else:
                 boundChannels.remove(message.channel.id)
-                sapi.dbUpdateSettings(
+                await dbUpdateSettings(
                     ['boundChannels', ' '.join(boundChannels)])
                 await client.send_message(message.channel, '***Unbound from this channel.***')
                 return boundChannels
@@ -162,7 +162,7 @@ async def on_message(message):
                     plName = plName.split()
                     plName.pop(0)
                     await client.send_message(message.channel, 'Adding to playlist.')
-                    addResp = sapi.addToPlaylist(
+                    addResp = await addToPlaylist(
                         plName, response[2], message.author.id)
                     if addResp[0] == 0:
                         await client.send_message(message.channel, 'Successfully added to playlist `{}`'.format(plName))
@@ -271,7 +271,7 @@ async def on_message(message):
                     ('Received command > prefix >> {1} | From {0.author} in {0.server.name}/{0.channel}'.format(message, msg)))
                 PREF = msg
                 await client.send_message(message.channel, 'Changed prefix to `%s`' % PREF)
-                sapi.dbUpdateSettings((['prefix', PREF]))
+                await dbUpdateSettings((['prefix', PREF]))
                 return PREF
             else:
                 await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
