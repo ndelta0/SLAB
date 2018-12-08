@@ -103,7 +103,7 @@ def tokenSwap():
 	global clientSecret
 
 	# wb.open('https://accounts.spotify.com/authorize?client_id=d3df69ad53ad4fe0afe621a68a2e852b&response_type=code&redirect_uri=https://march3wqa.github.io/SLAB/oauth/tokenswap/index.html&scope=playlist-modify-public', new=2)
-	print('https://accounts.spotify.com/authorize?client_id=d3df69ad53ad4fe0afe621a68a2e852b&response_type=code&redirect_uri=https://march3wqa.github.io/SLAB/oauth/tokenswap/index.html&scope=playlist-modify-public%20playlist-modify-private')
+	print('https://accounts.spotify.com/authorize?client_id=d3df69ad53ad4fe0afe621a68a2e852b&response_type=code&redirect_uri=https://march3wqa.github.io/SLAB/oauth/tokenswap/index.html&scope=playlist-modify-public')
 	apiCode = input('Code >> ')
 
 	authKey = clientID + ':' + clientSecret
@@ -123,7 +123,7 @@ def tokenSwap():
 		accessToken = respJson['access_token']
 		refreshToken = respJson['refresh_token']
 		header['Authorization'] = 'Bearer '+ accessToken
-		await dbUpdateSettings(['spotifyAccessToken', accessToken], ['spotifyRefreshToken', refreshToken])
+		dbUpdateSettings(['spotifyAccessToken', accessToken], ['spotifyRefreshToken', refreshToken])
 		return accessToken, refreshToken, header
 	else:
 		print(respJson['error'] + ' >> ' + respJson['error_description'])
@@ -239,17 +239,13 @@ def addToPlaylist(playlistName, uri, user):
 		if resp.status_code == 201:
 			playlistsList = dbUpdatePlaylists('update', name=playlistName, user=user)
 
-			return([0, playlistsList])
-		elif resp.status_code == 403:
-			respJson = resp.json()
-			logger.error((str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
-			return([3])
+			return(0, playlistsList)
 		else:
 			respJson = resp.json()
-			logger.error((str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
-			return([1])
+			print(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
+			return(1)
 	else:
-		return([2])
+		return(2)
 
 ### TODO: Get playlist by name
 def getPlaylist(name):
