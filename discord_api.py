@@ -30,6 +30,7 @@ settingsDict['boundChannels'] = boundChannelsList
 PREF = settingsDict['prefix']
 boundChannels = settingsDict['boundChannels']
 DISCORDTOKEN = settingsDict['discordToken']
+clamp = lambda n, minn, maxn: max(min(maxn, n), minn)
 # <----->
 
 # Classes
@@ -42,6 +43,10 @@ class GracefulKiller:
     def exit_gracefully(self, signum, frame):
         self.kill_now = True 
 
+def sigterm_handler(signal, frame):
+    stopCode = True
+    raise SystemExit
+signal.signal(signal.SIGTERM, sigterm_handler)
 
 client = discord.Client()
 
@@ -52,16 +57,21 @@ async def statusChange():
     elif os.environ['bot-build'] == 'stable':
         suffix = '-stable'
     await client.wait_until_ready()
-    while not client.is_closed:
-        while 1:
-            await client.change_presence(game = discord.Game(name='SLAB v0.2.2{}'.format(suffix)))
+    while 1:
+        try:
+            await client.change_presence(game = discord.Game(name='SLAB v1.1{}'.format(suffix)))
             await asyncio.sleep(15)
             helpStr = 'Type %shelp for help!' % PREF
             await client.change_presence(game = discord.Game(name=helpStr))
             await asyncio.sleep(15)
+        except BaseException as err:
+            logger.critical('Exception occurred: {} '.format(err))
+            client.connect()
+            break
 
 @client.event
 async def on_message(message):
+    await client.wait_until_ready()
     global PREF
     global boundChannels
     
@@ -140,15 +150,18 @@ async def on_message(message):
                     plName = ans.content
                     plName = plName.split()
                     plName.pop(0)
-                    await client.send_message(message.channel, 'Adding to playlist.')
-                    addResp = sapi.addToPlaylist(plName, response[2], message.author.id)
+                    plName = ''.join(plName)
+                    await client.send_message(message.channel, 'Adding to playlist...')
+                    addResp = await addToPlaylist(plName, response[2], message.author.id)
                     if addResp[0] == 0:
                         await client.send_message(message.channel, 'Successfully added to playlist `{}`'.format(plName))
                     elif addResp[0] == 1:
                         await client.send_message(message.channel, 'Unable to add to playlist `{}`'.format(plName))
                     elif addResp[0] == 2:
                         await client.send_message(message.channel, 'No playlist named `{}`'.format(plName))
-                elif ans.content.lower().startswith == '{}no'.format(PREF):
+                    elif addResp[0] == 3:
+                        await client.send_message(message.channel, 'Authorization failure. Contact your admin.')
+                elif ans.clean_content.lower().startswith('{}no'.format(PREF)):
                     await client.send_message(message.channel, 'Cancelled.')
                 else:
                     await client.send_message(message.channel, 'Invalid answer. Cancelling.')
@@ -251,8 +264,72 @@ async def on_message(message):
                 await client.send_message(message.author, 'You don\'t have a premium subscribtion')
             else:
                 await client.send_message(message.author, authResponse)
+        elif message.content.lower().startswith('%sdelete' % PREF):
+            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
+                msg = message.content
+                msgList = msg.split()
+                msgList.pop(0)
+                
+                if msgList == []:
+                    await client.send_message(message.channel, ':x:** Proper use:** `%sdelete <song URI> <playlist name>`' % PREF)
+                    return
+                
+                playlistName = ' '.join(msg[1:])
+                logger.info(('Received command > delete >> {1} - {2}| From {0.author} in {0.server.name}/{0.channel}'.format(message, msg[0], playlistName)))
+                response = await removeSong(msg[0], playlistName)
 
-    
+                if response[0] == 1:
+                    await client.send_message(message.channel, 'Error deleting song.')
+                elif response[0] == 2:
+                    await client.send_message(message.channel, 'No playlists')
+                elif response[0] == 3:
+                    await client.send_message(message.channel, 'Invalid character(s). Remove or replace any non-ascii characters.')
+                elif response[0] == 4:
+                    await client.send_message(message.channel, 'No playlists with name `{}`'.format(msg[0]))
+                elif response[0] == 0:
+                    await client.send_message(message.channel, 'Song successfully removed.')
+            else:
+                await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
+
+        elif message.content.lower().startswith('%splaylist' % PREF):
+            msg = message.content.lower()
+            msgList = msg.split()
+            msgList.pop(0)
+            
+            if msgList == []:
+                await client.send_message(message.channel, ':x:** Proper use:** `%splaylist <playlist\'s name>`' % PREF)
+                return
+            
+            msg = ' '.join(msgList)
+            logger.info(('Received command > playlist >> {1} | From {0.author} in {0.server.name}/{0.channel}'.format(message, msg)))
+
+            response = await getPlaylist(msg)
+
+            if response[0] == 1:
+                await client.send_message(message.channel, 'Something went wrong.')
+            elif response[0] == 2:
+                await client.send_message(message.channel, 'No playlists.')
+            elif response[0] == 3:
+                await client.send_message(message.channel, 'Invalid character(s). Remove or replace any non-ascii characters.')
+            elif response[0] == 0:
+                await client.send_message(message.channel, response[1])
+
+        elif message.content.lower().startswith('%sclear' % PREF):
+            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
+                msg = message.content.lower()
+                msgList = msg.split()
+                msgList.pop(0)
+                if msgList == []:
+                    return
+                limit = int(msgList[0])
+                limit + 1
+                limit = clamp(n=limit, minn=2, maxn=100)
+                channel = message.channel
+                messages = []
+                async for message in client.logs_from(channel, limit=limit):
+                    messages.append(message)
+                await client.delete_messages(messages)
+
 @client.event
 async def on_ready():
     print('Logged in as')
@@ -260,5 +337,23 @@ async def on_ready():
     print(client.user.id)
     print('------')
 
-client.loop.create_task(statusChange())
-client.run(DISCORDTOKEN)
+if __name__ == "__main__":
+    logger.info(('Starting code...'))
+    client.loop.create_task(statusChange())
+    while True:
+        try:
+            client.loop.run_until_complete(client.start(DISCORDTOKEN))
+        except SystemExit as err:
+            logger.info('Stopping code...')
+            stopCode = True
+            client.logout()
+            logger.info('Stopped code')
+        except KeyboardInterrupt as err:
+            logger.info('Stopping code...')
+            stopCode = True
+            client.logout()
+            logger.info('Stopped code')
+        except BaseException as err:
+            logger.critical('Exception occurred: {} '.format(err))
+            logger.info('Trying to reconnect...')
+        if stopCode: break
