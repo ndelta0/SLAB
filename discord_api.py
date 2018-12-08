@@ -40,15 +40,10 @@ logger.addHandler(ch)
 PREF = settingsDict['prefix']
 boundChannels = settingsDict['boundChannels']
 DISCORDTOKEN = settingsDict['discordToken']
-clamp = lambda n, minn, maxn: max(min(maxn, n), minn)
 # <----->
 
 client = discord.Client()
 
-def sigterm_handler(signal, frame):
-    stopCode = True
-    raise SystemExit
-signal.signal(signal.SIGTERM, sigterm_handler)
 
 async def statusChange():
     global statusRun
@@ -64,14 +59,9 @@ async def statusChange():
             helpStr = 'Type %shelp for help!' % PREF
             await client.change_presence(game = discord.Game(name=helpStr))
             await asyncio.sleep(15)
-        except BaseException as err:
-            logger.critical('Exception occurred: {} '.format(err))
-            client.connect()
-            break
 
 @client.event
 async def on_message(message):
-    await client.wait_until_ready()
     global PREF
     global boundChannels
     
@@ -155,18 +145,15 @@ async def on_message(message):
                     plName = ans.content
                     plName = plName.split()
                     plName.pop(0)
-                    plName = ''.join(plName)
-                    await client.send_message(message.channel, 'Adding to playlist...')
-                    addResp = await addToPlaylist(plName, response[2], message.author.id)
+                    await client.send_message(message.channel, 'Adding to playlist.')
+                    addResp = sapi.addToPlaylist(plName, response[2], message.author.id)
                     if addResp[0] == 0:
                         await client.send_message(message.channel, 'Successfully added to playlist `{}`'.format(plName))
                     elif addResp[0] == 1:
                         await client.send_message(message.channel, 'Unable to add to playlist `{}`'.format(plName))
                     elif addResp[0] == 2:
                         await client.send_message(message.channel, 'No playlist named `{}`'.format(plName))
-                    elif addResp[0] == 3:
-                        await client.send_message(message.channel, 'Authorization failure. Contact your admin.')
-                elif ans.clean_content.lower().startswith('{}no'.format(PREF)):
+                elif ans.content.lower().startswith == '{}no'.format(PREF):
                     await client.send_message(message.channel, 'Cancelled.')
                 else:
                     await client.send_message(message.channel, 'Invalid answer. Cancelling.')
@@ -369,6 +356,7 @@ async def on_message(message):
                     messages.append(message)
                 await client.delete_messages(messages)
 
+    
 @client.event
 async def on_ready():
     logger.info(('Logging in as:'))
