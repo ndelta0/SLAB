@@ -40,13 +40,14 @@ logger.addHandler(ch)
 PREF = settingsDict['prefix']
 boundChannels = settingsDict['boundChannels']
 DISCORDTOKEN = settingsDict['discordToken']
+clamp = lambda n, minn, maxn: max(min(maxn, n), minn)
 # <----->
 
 client = discord.Client()
 
 def sigterm_handler(signal, frame):
-    client.close()
     stopCode = True
+    raise SystemExit
 signal.signal(signal.SIGTERM, sigterm_handler)
 
 async def statusChange():
@@ -57,15 +58,20 @@ async def statusChange():
         suffix = '-stable'
     await client.wait_until_ready()
     while 1:
-        await client.change_presence(game = discord.Game(name='SLAB v1{}'.format(suffix)))
-        await asyncio.sleep(15)
-        helpStr = 'Type %shelp for help!' % PREF
-        await client.change_presence(game = discord.Game(name=helpStr))
-        await asyncio.sleep(15)
+        try:
+            await client.change_presence(game = discord.Game(name='SLAB v1{}'.format(suffix)))
+            await asyncio.sleep(15)
+            helpStr = 'Type %shelp for help!' % PREF
+            await client.change_presence(game = discord.Game(name=helpStr))
+            await asyncio.sleep(15)
+        except BaseException as err:
+            logger.critical('Exception occurred: {} '.format(err))
+            client.connect()
+            break
 
 @client.event
 async def on_message(message):
-    await client.wait_until_login()
+    await client.wait_until_ready()
     global PREF
     global boundChannels
     
@@ -150,7 +156,7 @@ async def on_message(message):
                     plName = plName.split()
                     plName.pop(0)
                     plName = ''.join(plName)
-                    await client.send_message(message.channel, 'Adding to playlist.')
+                    await client.send_message(message.channel, 'Adding to playlist...')
                     addResp = await addToPlaylist(plName, response[2], message.author.id)
                     if addResp[0] == 0:
                         await client.send_message(message.channel, 'Successfully added to playlist `{}`'.format(plName))
@@ -158,6 +164,8 @@ async def on_message(message):
                         await client.send_message(message.channel, 'Unable to add to playlist `{}`'.format(plName))
                     elif addResp[0] == 2:
                         await client.send_message(message.channel, 'No playlist named `{}`'.format(plName))
+                    elif addResp[0] == 3:
+                        await client.send_message(message.channel, 'Authorization failure. Contact your admin.')
                 elif ans.clean_content.lower().startswith('{}no'.format(PREF)):
                     await client.send_message(message.channel, 'Cancelled.')
                 else:
@@ -345,6 +353,22 @@ async def on_message(message):
             elif response[0] == 0:
                 await client.send_message(message.channel, response[1])
 
+        elif message.content.lower().startswith('%sclear' % PREF):
+            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
+                msg = message.content.lower()
+                msgList = msg.split()
+                msgList.pop(0)
+                if msgList == []:
+                    return
+                limit = int(msgList[0])
+                limit + 1
+                limit = clamp(n=limit, minn=2, maxn=100)
+                channel = message.channel
+                messages = []
+                async for message in client.logs_from(channel, limit=limit):
+                    messages.append(message)
+                await client.delete_messages(messages)
+
 @client.event
 async def on_ready():
     logger.info(('Logging in as:'))
@@ -362,14 +386,18 @@ if __name__ == "__main__":
     while True:
         try:
             client.loop.run_until_complete(client.start(DISCORDTOKEN))
+        except SystemExit as err:
+            logger.info('Stopping code...')
+            stopCode = True
+            client.logout()
+            logger.info('Stopped code')
         except KeyboardInterrupt as err:
             logger.info('Stopping code...')
             stopCode = True
             client.logout()
             logger.info('Stopped code')
-        except Exception as err:
+        except BaseException as err:
             logger.critical('Exception occurred: {} '.format(err))
             logger.info('Trying to reconnect...')
-            client.login(DISCORDTOKEN)
         if stopCode: break
         
