@@ -1,4 +1,5 @@
-discord.py
-requests
-asyncio
-mysql-connector
+discord.py==0.16.12
+requests==2.20.1
+asyncio==3.4.3
+mysql-connector==2.1.6
+colorama==0.4.1

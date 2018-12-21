@@ -3,19 +3,22 @@ import logging
 import os
 import signal
 import threading
-
+import colorama
 import discord
 import mysql.connector
 from discord.compat import create_task
-
 from spotify_api import *
-
+colorama.init(autoreset=True)
 # MySQL
 database = mysql.connector.connect(
-    host=os.environ['db-host'],
-    user=os.environ['db-user'],
-    passwd=os.environ['db-passwd'],
-    database=os.environ['db-dbname']
+    # host=os.environ['db-host'],
+    # user=os.environ['db-user'],
+    # passwd=os.environ['db-passwd'],
+    # database=os.environ['db-dbname']
+    host='eu-cdbr-west-02.cleardb.net',
+    user='bb7e95af5b4a8e',
+    passwd='43bbd667',
+    database='heroku_f36291aed7ea23f'
 )
 botCursor = database.cursor()
 
@@ -31,13 +34,33 @@ boundChannelsList = boundChannelsStr.split()
 settingsDict['boundChannels'] = boundChannelsList
 
 # Variables & classes
+class MyFormatter(logging.Formatter):
+    info_fmt = ('%(name)s || %(levelname)s: %(message)s')
+    warn_fmt = ('\033[36m%(name)s || %(levelname)s: %(message)s')
+    err_fmt = ('\033[33m%(name)s || %(levelname)s: %(message)s')
+    crit_fmt = ('\033[31m%(name)s || %(levelname)s: %(message)s')
+    def __init__(self):
+        super().__init__(fmt='%(levelno)d: %(msg)s', datefmt=None, style='%')
+    def format(self, record):
+        format_orig = self._style._fmt
+        if record.levelno == logging.INFO:
+            self._style._fmt = MyFormatter.info_fmt
+        elif record.levelno == logging.WARNING:
+            self._style._fmt = MyFormatter.warn_fmt
+        elif record.levelno == logging.ERROR:
+            self._style._fmt = MyFormatter.err_fmt
+        elif record.levelno == logging.CRITICAL:
+            self._style._fmt = MyFormatter.crit_fmt
+        result = logging.Formatter.format(self, record)
+        self._style_fmt = format_orig
+        return result
 stopCode = False
+formInst = MyFormatter()
 logger = logging.getLogger('DiscordAPI')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-formatter = logging.Formatter('%(name)s || %(levelname)s: %(message)s')
-ch.setFormatter(formatter)
+ch.setLevel(logging.DEBUG)
+ch.setFormatter(formInst)
 logger.addHandler(ch)
 PREF = settingsDict['prefix']
 boundChannels = settingsDict['boundChannels']
@@ -58,6 +81,7 @@ async def statusChange():
     botVersion = os.environ['botVersion']
     while 1:
         try:
+            await client.wait_until_ready()
             await client.change_presence(game=discord.Game(name='SLAB v{}{}'.format(botVersion, suffix)))
             await asyncio.sleep(15)
             helpStr = 'Type %shelp for help!' % PREF
@@ -65,9 +89,7 @@ async def statusChange():
             await asyncio.sleep(15)
         except BaseException as err:
             logger.critical('Exception occurred: {} '.format(err))
-            stopCode = True
             break
-
 
 @client.event
 async def on_message(message):
@@ -95,8 +117,8 @@ async def on_message(message):
             await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
 
     if message.content.lower().startswith('%sunbind' % PREF):
-        print(
-            'Received command > unbind | From {0.author} in {0.server.name}/{0.channel}'.format(message))
+        logger.info((
+            'Received command > unbind | From {0.author} in {0.server.name}/{0.channel}'.format(message)))
         if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
             if message.channel.id not in boundChannels:
                 await client.send_message(message.channel, 'Not binded')
@@ -161,16 +183,17 @@ async def on_message(message):
                     plName = ans.content
                     plName = plName.split()
                     plName.pop(0)
-                    await client.send_message(message.channel, 'Adding to playlist.')
-                    addResp = await addToPlaylist(
-                        plName, response[2], message.author.id)
+                    if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True: admin = True
+                    addResp = await addToPlaylist(plName[0], response[2], message.author.id, admin)
                     if addResp[0] == 0:
-                        await client.send_message(message.channel, 'Successfully added to playlist `{}`'.format(plName))
+                        await client.send_message(message.channel, 'Successfully added to playlist `{}`'.format(plName[0]))
                     elif addResp[0] == 1:
-                        await client.send_message(message.channel, 'Unable to add to playlist `{}`'.format(plName))
+                        await client.send_message(message.channel, 'Unable to add to playlist `{}`'.format(plName[0]))
                     elif addResp[0] == 2:
-                        await client.send_message(message.channel, 'No playlist named `{}`'.format(plName))
-                elif ans.content.lower().startswith == '{}no'.format(PREF):
+                        await client.send_message(message.channel, 'No playlist named `{}` or no playlists'.format(plName[0]))
+                    elif addResp[0] == 3:
+                        await client.send_message(message.channel, 'You already done your part creating the playlist')
+                elif ans.content.lower().startswith('{}no'.format(PREF)):
                     await client.send_message(message.channel, 'Cancelled.')
                 else:
                     await client.send_message(message.channel, 'Invalid answer. Cancelling.')
@@ -307,6 +330,8 @@ async def on_message(message):
                 name='%sbind' % PREF, value='Binds bot to current channel', inline=True)
             helpEmbed.add_field(
                 name='%sunbind' % PREF, value='Unbinds bot from current channel', inline=True)
+            helpEmbed.add_field(
+                name='%sclear <number>'%PREF, value='Clears number of messages in current channel', inline=True)
             helpEmbed.set_footer(text='Made with 💖 by {0.name}#{0.discriminator}'.format(
                 user), icon_url=user.avatar_url)
             await client.send_message(message.channel, embed=helpEmbed)
@@ -339,10 +364,9 @@ async def on_message(message):
                     await client.send_message(message.channel, ':x:** Proper use:** `%sdelete <song URI> <playlist name>`' % PREF)
                     return
 
-                playlistName = ' '.join(msg[1:])
-                logger.info(
-                    ('Received command > delete >> {1} - {2}| From {0.author} in {0.server.name}/{0.channel}'.format(message, msg[0], playlistName)))
-                response = await removeSong(msg[0], playlistName)
+                playlistName = ' '.join(msgList[1:])
+                logger.info(('Received command > delete >> {1} - {2} | From {0.author} in {0.server.name}/{0.channel}'.format(message, msgList[0], playlistName)))
+                response = await removeSong(msgList[0], playlistName)
 
                 if response[0] == 1:
                     await client.send_message(message.channel, 'Error deleting song.')
@@ -373,7 +397,7 @@ async def on_message(message):
             response = await getPlaylist(msg)
 
             if response[0] == 1:
-                await client.send_message(message.channel, 'Something went wrong.')
+                await client.send_message(message.channel, 'No playlist with name `{}`'.format(msg))
             elif response[0] == 2:
                 await client.send_message(message.channel, 'No playlists.')
             elif response[0] == 3:
@@ -405,7 +429,6 @@ async def on_ready():
     logger.info((client.user.id))
     logger.info(('------'))
 
-
 @client.event
 async def on_resumed():
     logger.info('Reconnected')
@@ -417,17 +440,22 @@ if __name__ == "__main__":
         try:
             client.loop.run_until_complete(client.start(DISCORDTOKEN))
         except SystemExit as err:
-            logger.info('Stopping code...')
+            logger.info('Stopping code... (SystemExit)')
             stopCode = True
             client.logout()
             logger.info('Stopped code')
         except KeyboardInterrupt as err:
-            logger.info('Stopping code...')
+            logger.info('Stopping code... (KeyboardInterrupt)')
             stopCode = True
             client.logout()
             logger.info('Stopped code')
+        except RuntimeError as err:
+            logger.critical('Exception occurred: {} '.format(err))
+            stopCode = True
         except BaseException as err:
             logger.critical('Exception occurred: {} '.format(err))
             logger.info('Trying to reconnect...')
+            client.logout()
         if stopCode:
             break
+    exit(0)
