@@ -431,7 +431,7 @@ async def on_resumed():
 
 @client.event
 async def on_member_update(bef, aft):
-    if len(bef.roles) == 1 and aft.roles[1].name == 'READ THE RULES ❗':
+    if not (len(bef.roles) == 1 and 'READ THE RULES ❗' in [y.name for y in aft.roles]):
         await client.send_message(discord.Object(id='409023617549205515'), '{0}, if you want to obtain PREMIUM ⭐ role, type in `{2}verify` in {3}'.format(aft.mention, PREF, aft.server._channels['409066385453613079'].mention))
 
 if __name__ == "__main__":
