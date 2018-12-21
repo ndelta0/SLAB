@@ -419,8 +419,7 @@ async def on_message(message):
 
     elif message.content.lower().startswith('%sdebug' % PREF):
         for role in message.author.roles:
-            for item in role:
-                await client.send_message(message.author, item)
+            await client.send_message(message.author, ', '.join(str(x) for x in [role, role.id, role.name, role.permissions, role.server, role.color, role.hoist, role.position, role.managed, role.mentionable, role.is_everyone, role.created_at, role.mention]))
             await client.send_message(message.author, '=====')
         await client.send_message(message.author, 'Finished')
 
