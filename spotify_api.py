@@ -71,11 +71,14 @@ async def dbUpdateSettings(*parameters):
         else:
             parametersStr = parametersStr + ', '
     sql = 'UPDATE bot_settings SET %s' % parametersStr
-    botCursor.execute(sql)
-    database.commit()
-
-# TODO: Add delete song functionality
-# /TODO/: Add delete playlist functionality
+    try:
+        botCursor.execute(sql)
+        database.commit()
+    except BaseException as err:
+        logger.critical('Exception occurred: {} '.format(err))
+        database.reconnect(100)
+        botCursor.execute(sql)
+        database.commit()
 
 
 async def dbUpdatePlaylists(action, name=None, url=None, ID=None, user=None):
@@ -83,8 +86,14 @@ async def dbUpdatePlaylists(action, name=None, url=None, ID=None, user=None):
     if action == 'create':
         sql = 'INSERT INTO playlists (name, url, id) VALUES (\'%s\', \'%s\', \'%s\')' % (
             name, url, ID)
-        botCursor.execute(sql)
-        database.commit()
+        try:
+            botCursor.execute(sql)
+            database.commit()
+        except BaseException as err:
+            logger.critical('Exception occurred: {} '.format(err))
+            database.reconnect(100)
+            botCursor.execute(sql)
+            database.commit()
     elif action == 'update':
         if user == None:
             sql = 'UPDATE playlists SET users = \'%s\' WHERE name = \'%s\'' % (
@@ -99,12 +108,24 @@ async def dbUpdatePlaylists(action, name=None, url=None, ID=None, user=None):
                     currUsersStr = ' '.join(currUsers)
                     sql = 'UPDATE playlists SET users = \'%s\' WHERE name = \'%s\'' % (
                         currUsersStr, name)
-        botCursor.execute(sql)
-        database.commit()
+        try:
+            botCursor.execute(sql)
+            database.commit()
+        except BaseException as err:
+            logger.critical('Exception occurred: {} '.format(err))
+            database.reconnect(100)
+            botCursor.execute(sql)
+            database.commit()
     elif action == 'delplaylist':
         sql = 'DELETE FROM playlists WHERE name = \'%s\'' % name
-        botCursor.execute(sql)
-        database.commit()
+        try:
+            botCursor.execute(sql)
+            database.commit()
+        except BaseException as err:
+            logger.critical('Exception occurred: {} '.format(err))
+            database.reconnect(100)
+            botCursor.execute(sql)
+            database.commit()
     else:
         return(1)
     botCursor.execute('SELECT * FROM playlists')
@@ -280,7 +301,7 @@ async def removePlaylist(name):
         name.encode('ascii')
     except Exception as err:
         return([3])
-    if any(d['name'] == name for d in playlistsList):
+    if not playlistsList == {}:
         for item in playlistsList:
             if item['name'] == name:
                 playlistID = item['id']
@@ -306,28 +327,48 @@ async def removePlaylist(name):
         return([1])
 
 
-async def addToPlaylist(playlistName, id, user):
+async def addToPlaylist(playlistName, id, user, admin):
     global playlistsList
-    if any(d['name'] == playlistName for d in playlistsList):
-        for item in playlistsList:
-            if item['name'] == playlistName:
-                playlistID = item['id']
-        url = 'https://api.spotify.com/v1/playlists/%s/tracks' % playlistID
-        params = {'uris': 'spotify:track:{}'.format(id)}
-        resp = rq.post(url=url, params=params, headers=header)
+    try:
+        if not playlistsList == {}:
+            for item in playlistsList:
+                if item['name'] == playlistName:
+                    playlistID = item['id']
+                    if not admin:
+                        if user in item['users']:
+                            return([3])
+                    break
+            url = 'https://api.spotify.com/v1/playlists/%s/tracks' % playlistID
+            params = {'uris': 'spotify:track:{}'.format(id)}
+            resp = rq.post(url=url, params=params, headers=header)
 
-        if resp.status_code == 201:
-            playlistsList = await dbUpdatePlaylists('update', name=playlistName, user=user)
+            if resp.status_code == 201:
+                playlistsList = await dbUpdatePlaylists('update', name=playlistName, user=user)
 
-            return(0, playlistsList)
+                return([0, playlistsList])
+            else:
+                respJson = resp.json()
+                print(str(respJson['error']['status']) +
+                      ' >> ' + respJson['error']['message'])
+                return([1])
         else:
-            respJson = resp.json()
-            print(str(respJson['error']['status']) +
-                  ' >> ' + respJson['error']['message'])
-            return(1)
-    else:
-        return(2)
-
+            return([2])
+    except GeneratorExit:
+        botCursor.execute('SELECT * FROM playlists')
+        playlists = botCursor.fetchall()
+        fields = [item[0] for item in botCursor.description]
+        playlistsList = []
+        for i in range(len(playlists)):
+            playlistDict = {}
+            for k in range(len(playlists[i])):
+                extendDict = {fields[k]: playlists[i][k]}
+                playlistDict.update(extendDict)
+            if not playlistDict['users'] == None:
+                users = playlistDict['users']
+                usersList = users.split()
+                playlistDict['users'] = usersList
+            playlistsList.append(playlistDict)
+        return(await addToPlaylist(playlistName, id, user, admin), playlistsList)
 
 async def getPlaylists():
     global playlistsList
@@ -360,7 +401,7 @@ async def removeSong(URI, playlistName):
         return([4])
     customHeader = header
     customHeader.update({'Content-Type': 'application/json'})
-    jsonBody = '{\'tracks\': [{\'uri\': \'%s\'}]}'
+    jsonBody = '{"tracks": [{"uri": "%s"}]}' % URI
     url = 'https://api.spotify.com/v1/playlists/{}/tracks'.format(playlistID)
     resp = rq.delete(url=url, headers=customHeader, data=jsonBody)
 
