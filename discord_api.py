@@ -438,7 +438,7 @@ async def on_resumed():
 async def on_member_update(bef, aft):
     if '408991159990616074' in [y.id for y in bef.roles]:
         if '408991159990616074' not in [y.id for y in aft.roles]:
-            await client.send_message(discord.Object(id='409023617549205515'), '{0}, if you want to obtain PREMIUM ⭐ role, type in `{2}verify` in {3}'.format(aft.mention, PREF, aft.server._channels['409066385453613079'].mention))
+            await client.send_message(discord.Object(id='409023617549205515'), '{0}, if you want to obtain PREMIUM ⭐ role, type in `{1}verify` in {2}'.format(aft.mention, PREF, aft.server._channels['409066385453613079'].mention))
 
 if __name__ == "__main__":
     logger.info(('Starting code...'))
