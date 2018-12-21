@@ -327,7 +327,7 @@ async def removePlaylist(name):
         return([1])
 
 
-async def addToPlaylist(playlistName, id, user, admin):
+async def addToPlaylist(playlistName, id, user, admin = None):
     global playlistsList
     if not playlistsList == {}:
         for item in playlistsList:
