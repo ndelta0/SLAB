@@ -11,14 +11,10 @@ from spotify_api import *
 colorama.init(autoreset=True)
 # MySQL
 database = mysql.connector.connect(
-    # host=os.environ['db-host'],
-    # user=os.environ['db-user'],
-    # passwd=os.environ['db-passwd'],
-    # database=os.environ['db-dbname']
-    host='eu-cdbr-west-02.cleardb.net',
-    user='bb7e95af5b4a8e',
-    passwd='43bbd667',
-    database='heroku_f36291aed7ea23f'
+    host=os.environ['db-host'],
+    user=os.environ['db-user'],
+    passwd=os.environ['db-passwd'],
+    database=os.environ['db-dbname']
 )
 botCursor = database.cursor()
 
@@ -433,6 +429,11 @@ async def on_ready():
 async def on_resumed():
     logger.info('Reconnected')
 
+@client.event
+async def on_member_update(bef, aft):
+    if len(bef.roles) == 1 and aft.roles[1].name == 'READ THE RULES ❗':
+        await client.send_message(discord.Object(id='409023617549205515'), '{0}, if you want to obtain PREMIUM ⭐ role, type in `{2}verify` in {3}'.format(aft.mention, PREF, aft.server._channels['409066385453613079'].mention))
+
 if __name__ == "__main__":
     logger.info(('Starting code...'))
     client.loop.create_task(statusChange())
@@ -451,7 +452,7 @@ if __name__ == "__main__":
             logger.info('Stopped code')
         except RuntimeError as err:
             logger.critical('Exception occurred: {} '.format(err))
-            stopCode = True
+            client.close()
         except BaseException as err:
             logger.critical('Exception occurred: {} '.format(err))
             logger.info('Trying to reconnect...')

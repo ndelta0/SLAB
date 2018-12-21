@@ -11,14 +11,10 @@ import requests as rq
 
 # MySQL
 database = mysql.connector.connect(
-    # host=os.environ['db-host'],
-    # user=os.environ['db-user'],
-    # passwd=os.environ['db-passwd'],
-    # database=os.environ['db-dbname']
-    host='eu-cdbr-west-02.cleardb.net',
-    user='bb7e95af5b4a8e',
-    passwd='43bbd667',
-    database='heroku_f36291aed7ea23f'
+    host=os.environ['db-host'],
+    user=os.environ['db-user'],
+    passwd=os.environ['db-passwd'],
+    database=os.environ['db-dbname']
 )
 botCursor = database.cursor()
 
