@@ -417,6 +417,12 @@ async def on_message(message):
                     messages.append(message)
                 await client.delete_messages(messages)
 
+    elif message.content.lower().startswith('%sdebug' % PREF):
+        for role in message.author.roles:
+            for item in role:
+                await client.send_message(message.author, item)
+            await client.send_message(message.author, '=====')
+        await client.send_message(message.author, 'Finished')
 
 @client.event
 async def on_ready():
@@ -431,7 +437,7 @@ async def on_resumed():
 
 @client.event
 async def on_member_update(bef, aft):
-    if any(d == 'READ THE RULES ❗' for d in bef.roles):
+    if 'id' in [y.id for y in bef.roles]:
         if any(d != 'READ THE RULES ❗' for d in aft.roles):
             await client.send_message(discord.Object(id='409023617549205515'), '{0}, if you want to obtain PREMIUM ⭐ role, type in `{2}verify` in {3}'.format(aft.mention, PREF, aft.server._channels['409066385453613079'].mention))
 
