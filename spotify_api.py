@@ -353,22 +353,6 @@ async def addToPlaylist(playlistName, id, user, admin):
                 return([1])
         else:
             return([2])
-    except GeneratorExit:
-        botCursor.execute('SELECT * FROM playlists')
-        playlists = botCursor.fetchall()
-        fields = [item[0] for item in botCursor.description]
-        playlistsList = []
-        for i in range(len(playlists)):
-            playlistDict = {}
-            for k in range(len(playlists[i])):
-                extendDict = {fields[k]: playlists[i][k]}
-                playlistDict.update(extendDict)
-            if not playlistDict['users'] == None:
-                users = playlistDict['users']
-                usersList = users.split()
-                playlistDict['users'] = usersList
-            playlistsList.append(playlistDict)
-        return(await addToPlaylist(playlistName, id, user, admin), playlistsList)
 
 async def getPlaylists():
     global playlistsList
