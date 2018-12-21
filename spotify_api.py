@@ -334,6 +334,8 @@ async def addToPlaylist(playlistName, id, user, admin):
             if item['name'] == playlistName:
                 playlistID = item['id']
                 if not admin:
+                    if item['users'] == None:
+                        break
                     if user in item['users']:
                         return([3])
                 break
