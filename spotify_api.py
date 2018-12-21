@@ -329,30 +329,29 @@ async def removePlaylist(name):
 
 async def addToPlaylist(playlistName, id, user, admin):
     global playlistsList
-    try:
-        if not playlistsList == {}:
-            for item in playlistsList:
-                if item['name'] == playlistName:
-                    playlistID = item['id']
-                    if not admin:
-                        if user in item['users']:
-                            return([3])
-                    break
-            url = 'https://api.spotify.com/v1/playlists/%s/tracks' % playlistID
-            params = {'uris': 'spotify:track:{}'.format(id)}
-            resp = rq.post(url=url, params=params, headers=header)
+    if not playlistsList == {}:
+        for item in playlistsList:
+            if item['name'] == playlistName:
+                playlistID = item['id']
+                if not admin:
+                    if user in item['users']:
+                        return([3])
+                break
+        url = 'https://api.spotify.com/v1/playlists/%s/tracks' % playlistID
+        params = {'uris': 'spotify:track:{}'.format(id)}
+        resp = rq.post(url=url, params=params, headers=header)
 
-            if resp.status_code == 201:
-                playlistsList = await dbUpdatePlaylists('update', name=playlistName, user=user)
+        if resp.status_code == 201:
+            playlistsList = await dbUpdatePlaylists('update', name=playlistName, user=user)
 
-                return([0, playlistsList])
-            else:
-                respJson = resp.json()
-                print(str(respJson['error']['status']) +
-                      ' >> ' + respJson['error']['message'])
-                return([1])
+            return([0, playlistsList])
         else:
-            return([2])
+            respJson = resp.json()
+            print(str(respJson['error']['status']) +
+                    ' >> ' + respJson['error']['message'])
+            return([1])
+    else:
+        return([2])
 
 async def getPlaylists():
     global playlistsList
