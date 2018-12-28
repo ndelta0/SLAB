@@ -176,10 +176,7 @@ async def on_message(message):
                 ans = await client.wait_for_message(author=message.author, check=agreement, timeout=30)
 
                 if ans.content.lower().startswith('{}yes'.format(PREF)):
-                    plName = ans.content
-                    plName = plName.split()
-                    plName.pop(0)
-                    plName = ''.join(plName)
+                    plName = ' '.join(ans.content.split()[1:])
                     admin = False
                     if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True: admin = True
                     addResp = await addToPlaylist(plName, response[2], message.author.id, admin)
