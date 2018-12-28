@@ -181,11 +181,11 @@ async def on_message(message):
                     if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True: admin = True
                     addResp = await addToPlaylist(plName, response[2], message.author.id, admin)
                     if addResp[0] == 0:
-                        await client.send_message(message.channel, 'Successfully added to playlist `{}`'.format(plName[0]))
+                        await client.send_message(message.channel, 'Successfully added to playlist `{}`'.format(plName))
                     elif addResp[0] == 1:
-                        await client.send_message(message.channel, 'Unable to add to playlist `{}`'.format(plName[0]))
+                        await client.send_message(message.channel, 'Unable to add to playlist `{}`'.format(plName))
                     elif addResp[0] == 2:
-                        await client.send_message(message.channel, 'No playlist named `{}` or no playlists'.format(plName[0]))
+                        await client.send_message(message.channel, 'No playlist named `{}` or no playlists'.format(plName))
                     elif addResp[0] == 3:
                         await client.send_message(message.channel, 'You already done your part creating the playlist')
                 elif ans.content.lower().startswith('{}no'.format(PREF)):
