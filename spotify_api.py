@@ -327,7 +327,7 @@ async def removePlaylist(name):
         return([1])
 
 
-async def addToPlaylist(playlistName, id, user, admin):
+async def addToPlaylist(playlistName, uri, user, admin):
     global playlistsList
     if not playlistsList == {}:
         for item in playlistsList:
@@ -339,8 +339,10 @@ async def addToPlaylist(playlistName, id, user, admin):
                     if user in item['users']:
                         return([3])
                 break
+            else:
+                return([1])
         url = 'https://api.spotify.com/v1/playlists/%s/tracks' % playlistID
-        params = {'uris': 'spotify:track:{}'.format(id)}
+        params = {'uris': 'spotify:track:{}'.format(uri)}
         resp = rq.post(url=url, params=params, headers=header)
 
         if resp.status_code == 201:
