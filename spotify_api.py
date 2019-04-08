@@ -172,7 +172,7 @@ async def tokenSwap():
         accessToken = respJson['access_token']
         refreshToken = respJson['refresh_token']
         header['Authorization'] = 'Bearer ' + accessToken
-        dbUpdateSettings(['spotifyAccessToken', accessToken], [
+        await dbUpdateSettings(['spotifyAccessToken', accessToken], [
                          'spotifyRefreshToken', refreshToken])
         return accessToken, refreshToken, header
     else:
