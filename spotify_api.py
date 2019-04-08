@@ -149,8 +149,8 @@ async def tokenSwap():
     global clientID
     global clientSecret
 
-    # wb.open('https://accounts.spotify.com/authorize?client_id=d3df69ad53ad4fe0afe621a68a2e852b&response_type=code&redirect_uri=https://march3wqa.github.io/SLAB/oauth/tokenswap/index.html&scope=playlist-modify-public', new=2)
-    print('https://accounts.spotify.com/authorize?client_id=d3df69ad53ad4fe0afe621a68a2e852b&response_type=code&redirect_uri=https://march3wqa.github.io/SLAB/oauth/tokenswap/index.html&scope=playlist-modify-public')
+    # wb.open('https://accounts.spotify.com/authorize?client_id=9d77f7ddc6dd46e5af8e6b3138993548&response_type=code&redirect_uri=https://march3wqa.github.io/SLAB/oauth/tokenswap/index.html&scope=playlist-modify-public', new=2)
+    print('https://accounts.spotify.com/authorize?client_id=9d77f7ddc6dd46e5af8e6b3138993548&response_type=code&redirect_uri=https://march3wqa.github.io/SLAB/oauth/tokenswap/index.html&scope=playlist-modify-public')
     apiCode = input('Code >> ')
 
     authKey = clientID + ':' + clientSecret
@@ -271,7 +271,7 @@ async def createPlaylist(name):
         headerAdditional = {'Content-Type': 'application/json'}
         customHeader.update(headerAdditional)
 
-        resp = rq.post(url='https://api.spotify.com/v1/users/kyw80vp7fz3h6qrq4velkdmm8/playlists',
+        resp = rq.post(url='https://api.spotify.com/v1/users/i568kd6im29h32ispgjyohsip/playlists',
                        data=dataPost, headers=customHeader)
         respJson = resp.json()
 
