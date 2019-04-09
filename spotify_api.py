@@ -12,7 +12,7 @@ import requests as rq
 # MySQL
 database = mysql.connector.connect(
     host=os.environ['db-host'],
-    user=os.environ['db-user'],luil
+    user=os.environ['db-user'],
     passwd=os.environ['db-passwd'],
     database=os.environ['db-dbname']
 )
