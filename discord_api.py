@@ -6,8 +6,9 @@ import threading
 import colorama
 import discord
 import mysql.connector
-from discord.compat import create_task
+#from discord.compat import create_task
 from spotify_api import *
+
 colorama.init(autoreset=True)
 # MySQL
 database = mysql.connector.connect(
@@ -27,7 +28,10 @@ for i in range(len(settings)):
     settingsDict.update(extendDict)
 boundChannelsStr = settingsDict['boundChannels']
 boundChannelsList = boundChannelsStr.split()
-settingsDict['boundChannels'] = boundChannelsList
+settingsDict['boundChannels'] = [int(chid) for chid in boundChannelsList]
+
+settingsDict['boundChannels'].append(516168648373698563)
+settingsDict['discordToken'] = 'NTE2MTY5MTUxODQ1MzY3ODA5.XMXzBw.CjCKJH4pF0z0gCZovN10ah2GNTU'
 
 # Variables & classes
 class MyFormatter(logging.Formatter):
@@ -99,130 +103,124 @@ async def on_message(message):
 
     if message.content.lower().startswith('%sbind' % PREF):
         logger.info(
-            ('Received command > bind | From {0.author} in {0.server.name}/{0.channel}'.format(message)))
-        if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
+            ('Received command > bind | From {0.author} in {0..name}/{0.channel}'.format(message)))
+        if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_guild) or (message.author.id == 312223735505747968) == True:
             if message.channel.id in boundChannels:
-                await client.send_message(message.channel, 'Already bound')
+                await message.channel.send('Already bound')
             else:
                 boundChannels.append(message.channel.id)
                 await dbUpdateSettings(
                     ['boundChannels', ' '.join(boundChannels)])
-                await client.send_message(message.channel, '***Bound to this channel.***')
+                await message.channel.send('***Bound to this channel.***')
                 return boundChannels
         else:
-            await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
+            await message.channel.send(':x:***You are not allowed to execute that command!***')
 
     if message.content.lower().startswith('%sunbind' % PREF):
         logger.info((
-            'Received command > unbind | From {0.author} in {0.server.name}/{0.channel}'.format(message)))
-        if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
+            'Received command > unbind | From {0.author} in {0.guild.name}/{0.channel}'.format(message)))
+        if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_guild) or (message.author.id == 312223735505747968) == True:
             if message.channel.id not in boundChannels:
-                await client.send_message(message.channel, 'Not binded')
+                await message.channel.send('Not binded')
             else:
                 boundChannels.remove(message.channel.id)
                 await dbUpdateSettings(
                     ['boundChannels', ' '.join(boundChannels)])
-                await client.send_message(message.channel, '***Unbound from this channel.***')
+                await message.channel.send('***Unbound from this channel.***')
                 return boundChannels
         else:
-            await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
+            await message.channel.send(':x:***You are not allowed to execute that command!***')
 
     elif message.channel.id in boundChannels:
-        # ? Should this even be here?
-        if message.content.lower().startswith('%shello' % PREF):
-            msg = 'Hello {0.author.mention}'.format(message)
-            await client.send_message(message.channel, msg)
-            logger.info(
-                ('Received command > hello | From {0.author} in {0.server.name}/{0.channel}'.format(message)))
-
-        elif message.content.lower().startswith('%ssearch' % PREF):
+        if message.content.lower().startswith('%ssearch' % PREF):
             msg = message.content
             msgList = msg.split()
             msgList.pop(0)
 
             if msgList == []:
-                await client.send_message(message.channel, ':x:** Proper use:** `%ssearch <query/song URI>`' % PREF)
+                await message.channel.send(':x:** Proper use:** `%ssearch <query/song URI>`' % PREF)
                 return
 
             msg = ' '.join(msgList)
             logger.info(
-                ('Received command > search >> {1} | From {0.author} in {0.server.name}/{0.channel}'.format(message, msg)))
-            # await client.send_message(message.channel, msg)
+                ('Received command > search >> {1} | From {0.author} in {0.guild.name}/{0.channel}'.format(message, msg)))
+            # await message.channel.send(msg)
             response = await searchSong(msg)
 
             if response[0] == 1:
-                await client.send_message(message.channel, 'Something went wrong. Try again.')
+                await message.channel.send('Something went wrong. Try again.')
 
             elif response[0] == 2:
-                await client.send_message(message.channel, 'No results.')
+                await message.channel.send('No results.')
 
             elif response[0] == 3:
-                await client.send_message(message.channel, 'Invalid URI. Try copying/pasting it again.')
+                await message.channel.send('Invalid URI. Try copying/pasting it again.')
 
             elif response[0] == 4:
-                await client.send_message(message.channel, 'No track with that URI. Try copying/pasting it again.')
+                await message.channel.send('No track with that URI. Try copying/pasting it again.')
 
             elif response[0] == 0:
-                await client.send_message(message.channel, 'Is this the song you are looking for?')
-                await client.send_message(message.channel, response[1])
-                await client.send_message(message.channel, 'If yes, type `{0}yes <playlist\'s name>` to add to playlist or `{0}no` to cancel'.format(PREF))
+                await message.channel.send('Is this the song you are looking for?')
+                await message.channel.send(response[1])
+                await message.channel.send('If yes, type `{0}yes <playlist\'s name>` to add to playlist or `{0}no` to cancel'.format(PREF))
 
-                def agreement(ans):
-                    if ans.content.lower().startswith('%syes' % PREF):
-                        return('yes')
-                    else:
-                        return('no')
+                def agreement(m):
+                    if not m:
+                        return('timeout')
+                    elif m.author == message.author:
+                        if m.content.lower().startswith('%syes' % PREF):
+                            return('yes')
+                    return('no')
 
-                ans = await client.wait_for_message(author=message.author, check=agreement, timeout=30)
+                ans = await client.wait_for('message', check=agreement, timeout=30)
 
                 if ans.content.lower().startswith('{}yes'.format(PREF)):
                     plName = ' '.join(ans.content.split()[1:])
                     admin = False
-                    if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True: admin = True
+                    if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_guild) or (message.author.id == 312223735505747968) == True: admin = True
                     addResp = await addToPlaylist(plName, response[2], message.author.id, admin)
                     if addResp[0] == 0:
-                        await client.send_message(message.channel, 'Successfully added to playlist `{}`'.format(plName))
+                        await message.channel.send('Successfully added to playlist `{}`'.format(plName))
                     elif addResp[0] == 1:
-                        await client.send_message(message.channel, 'Unable to add to playlist `{}`'.format(plName))
+                        await message.channel.send('Unable to add to playlist `{}`'.format(plName))
                     elif addResp[0] == 2:
-                        await client.send_message(message.channel, 'No playlist named `{}` or no playlists'.format(plName))
+                        await message.channel.send('No playlist named `{}` or no playlists'.format(plName))
                     elif addResp[0] == 3:
-                        await client.send_message(message.channel, 'You already done your part creating the playlist')
+                        await message.channel.send('You already done your part creating the playlist')
                 elif ans.content.lower().startswith('{}no'.format(PREF)):
-                    await client.send_message(message.channel, 'Cancelled.')
-                else:
-                    await client.send_message(message.channel, 'Invalid answer. Cancelling.')
+                    await message.channel.send('Cancelled.')
+                await message.channel.send('Timed out.')
 
         elif message.content.lower().startswith('%screateplaylist' % PREF):
-            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
+            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_guild) or (message.author.id == 312223735505747968) == True:
 
                 msg = message.content.lower()
                 msgList = msg.split()
                 msgList.pop(0)
 
                 if msgList == []:
-                    await client.send_message(message.channel, ':x:** Proper use:** `%screateplaylist <playlist name>`' % PREF)
+                    await message.channel.send(':x:** Proper use:** `%screateplaylist <playlist name>`' % PREF)
                     return
 
                 msg = ' '.join(msgList)
                 logger.info(
-                    ('Received command > create >> {1} | From {0.author} in {0.server.name}/{0.channel}'.format(message, msg)))
+                    ('Received command > create >> {1} | From {0.author} in {0.guild.name}/{0.channel}'.format(message, msg)))
                 response = await createPlaylist(msg)
 
                 if response[0] == 1:
-                    await client.send_message(message.channel, 'Error creating playlist.')
+                    await message.channel.send('Error creating playlist.')
 
                 elif response[0] == 2:
-                    await client.send_message(message.channel, 'Playlist with that name already exists.')
+                    await message.channel.send('Playlist with that name already exists.')
 
                 elif response[0] == 3:
-                    await client.send_message(message.channel, 'Invalid character(s). Remove or replace any non-ascii characters.')
+                    await message.channel.send('Invalid character(s). Remove or replace any non-ascii characters.')
 
                 elif response[0] == 0:
-                    await client.send_message(message.channel, 'Successfully created playlist `{}`'.format(msg))
-                    await client.send_message(message.channel, response[1])
+                    await message.channel.send('Successfully created playlist `{}`'.format(msg))
+                    await message.channel.send(response[1])
             else:
-                await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
+                await message.channel.send(':x:***You are not allowed to execute that command!***')
 
         elif message.content.lower().startswith('%sdeleteplaylist' % PREF):
             msg = message.content.lower()
@@ -230,79 +228,78 @@ async def on_message(message):
             msgList.pop(0)
 
             if msgList == []:
-                await client.send_message(message.channel, ':x:** Proper use:** `%sdeleteplaylist <playlist name>`' % PREF)
+                await message.channel.send(':x:** Proper use:** `%sdeleteplaylist <playlist name>`' % PREF)
                 return
 
             msg = ' '.join(msgList)
             logger.info(
-                ('Received command > delete >> {1} | From {0.author} in {0.server.name}/{0.channel}'.format(message, msg)))
-            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
+                ('Received command > delete >> {1} | From {0.author} in {0.guild.name}/{0.channel}'.format(message, msg)))
+            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_guild) or (message.author.id == 312223735505747968) == True:
 
                 response = await removePlaylist(msg)
 
                 if response[0] == 1:
-                    await client.send_message(message.channel, 'Error deleting playlist.')
+                    await message.channel.send('Error deleting playlist.')
 
                 elif response[0] == 2:
-                    await client.send_message(message.channel, 'No playlist with that name.')
+                    await message.channel.send('No playlist with that name.')
 
                 elif response[0] == 3:
-                    await client.send_message(message.channel, 'Invalid character(s). Remove or replace any non-ascii characters.')
+                    await message.channel.send('Invalid character(s). Remove or replace any non-ascii characters.')
 
                 elif response[0] == 0:
-                    await client.send_message(message.channel, 'Successfully deleted playlist `{}`'.format(msg))
+                    await message.channel.send('Successfully deleted playlist `{}`'.format(msg))
             else:
-                await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
+                await message.channel.send(':x:***You are not allowed to execute that command!***')
 
         elif message.content.lower().startswith('%splaylists' % PREF):
             logger.info(
-                ('Received command > playlists | From {0.author} in {0.server.name}/{0.channel}'.format(message)))
+                ('Received command > playlists | From {0.author} in {0.guild.name}/{0.channel}'.format(message)))
             response = await getPlaylists()
             if response[0] == 1:
-                await client.send_message(message.channel, 'Error getting playlists.')
+                await message.channel.send('Error getting playlists.')
             if response[0] == 2:
-                await client.send_message(message.channel, 'No playlists.')
+                await message.channel.send('No playlists.')
             elif response[0] == 0:
-                user = await client.get_user_info('312223735505747968')
+                user = await client.fetch_user(312223735505747968)
                 playlistsEmbed = discord.Embed(color=discord.Color.green())
                 playlistsEmbed.set_author(
-                    name='SLAB playlists', icon_url=client.connection.user.avatar_url)
+                    name='SLAB playlists', icon_url=client.user.avatar_url)
                 for item in response[1]:
                     playlistsEmbed.add_field(
                         name=item[0], value=item[1], inline=True)
-                playlistsEmbed.set_footer(text='Made with 💖 by {0.name}#{0.discriminator}'.format(
-                    user), icon_url=user.avatar_url)
-                await client.send_message(message.channel, embed=playlistsEmbed)
+                playlistsEmbed.set_footer(text='Made with 💖 by {}'.format(str(user)), icon_url=user.avatar_url)
+                await message.channel.send(embed=playlistsEmbed)
 
         elif message.content.lower().startswith('%sprefix' % PREF):
-            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
+            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_guild) or (message.author.id == 312223735505747968) == True:
                 msg = message.content.lower()
                 msgList = msg.split()
                 msgList.pop(0)
 
                 if msgList == []:
-                    await client.send_message(message.channel, ':x:** Proper use:** `%sprefix <prefix>`' % PREF)
+                    await message.channel.send(':x:** Proper use:** `%sprefix <prefix>`' % PREF)
                     return
 
                 msg = ' '.join(msgList)
                 logger.info(
-                    ('Received command > prefix >> {1} | From {0.author} in {0.server.name}/{0.channel}'.format(message, msg)))
+                    ('Received command > prefix >> {1} | From {0.author} in {0.guild.name}/{0.channel}'.format(message, msg)))
                 PREF = msg
-                await client.send_message(message.channel, 'Changed prefix to `%s`' % PREF)
+                await message.channel.send('Changed prefix to `%s`' % PREF)
                 await dbUpdateSettings((['prefix', PREF]))
                 return PREF
             else:
-                await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
+                await message.channel.send(':x:***You are not allowed to execute that command!***')
 
         elif message.content.lower().startswith('%shelp' % PREF):
             logger.info(
-                ('Received command > help | From {0.author} in {0.server.name}/{0.channel}'.format(message)))
-            user = await client.get_user_info('312223735505747968')
+                ('Received command > help | From {0.author} in {0.guild.name}/{0.channel}'.format(message)))
+            user = await client.fetch_user(312223735505747968)
             helpEmbed = discord.Embed(
                 color=discord.Color.green()
             )
             helpEmbed.set_author(
-                name='SLAB Help', icon_url=client.connection.user.avatar_url)
+                name='SLAB Help', icon_url=client.user.avatar_url)
             helpEmbed.add_field(name='%shelp' %
                                 PREF, value='Shows this help', inline=True)
             helpEmbed.add_field(
@@ -327,54 +324,54 @@ async def on_message(message):
                 name='%sunbind' % PREF, value='Unbinds bot from current channel', inline=True)
             helpEmbed.add_field(
                 name='%sclear <number>'%PREF, value='Clears number of messages in current channel', inline=True)
-            helpEmbed.set_footer(text='Made with 💖 by {0.name}#{0.discriminator}'.format(
-                user), icon_url=user.avatar_url)
-            await client.send_message(message.channel, embed=helpEmbed)
+            helpEmbed.set_footer(text='Made with 💖 by {}'.format(
+                str(user)), icon_url=user.avatar_url)
+            await message.channel.send(embed=helpEmbed)
 
         elif message.content.lower().startswith('%sverify' % PREF):
             logger.info(
-                ('Received command > verify | From {0.author} in {0.server.name}/{0.channel}'.format(message)))
-            serverObj = client.get_server(message.server.id)
+                ('Received command > verify | From {0.author} in {0.guild.name}/{0.channel}'.format(message)))
+            guildObj = client.get_guild(message.guild.id)
             memberObj = message.author
             response = await verifyPremiumStep1()
-            await client.send_message(message.author, ('To verify the account go to the following page and paste in the token:\n' + response))
-            answ = await client.wait_for_message(author=message.author, timeout=600)
+            await message.author.send(('To verify the account go to the following page and paste in the token:\n' + response))
+            answ = await client.wait_for('message', timeout=600)
             authResponse = await verifyPremiumStep2(answ.content)
             if authResponse == True:
-                await client.send_message(message.author, 'You have premium subscription. You just got `PREMIUM ⭐` role')
-                role = discord.utils.get(serverObj.roles, name='PREMIUM ⭐')
-                await client.add_roles(memberObj, role)
+                await message.author.send('You have premium subscription. You just got `PREMIUM ⭐` role')
+                role = discord.utils.get(guildObj.roles, name='PREMIUM ⭐')
+                await memberObj.add_roles(role, reason='Verified Spotify premium account')
             elif authResponse == False:
-                await client.send_message(message.author, 'You don\'t have a premium subscribtion')
+                await message.author.send('You don\'t have a premium subscribtion')
             else:
-                await client.send_message(message.author, authResponse)
+                await message.author.send(authResponse)
 
         elif message.content.lower().startswith('%sdelete' % PREF):
-            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
+            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_guild) or (message.author.id == 312223735505747968) == True:
                 msg = message.content
                 msgList = msg.split()
                 msgList.pop(0)
 
                 if msgList == []:
-                    await client.send_message(message.channel, ':x:** Proper use:** `%sdelete <song URI> <playlist name>`' % PREF)
+                    await message.channel.send(':x:** Proper use:** `%sdelete <song URI> <playlist name>`' % PREF)
                     return
 
                 playlistName = ' '.join(msgList[1:])
-                logger.info(('Received command > delete >> {1} - {2} | From {0.author} in {0.server.name}/{0.channel}'.format(message, msgList[0], playlistName)))
+                logger.info(('Received command > delete >> {1} - {2} | From {0.author} in {0.guild.name}/{0.channel}'.format(message, msgList[0], playlistName)))
                 response = await removeSong(msgList[0], playlistName)
 
                 if response[0] == 1:
-                    await client.send_message(message.channel, 'Error deleting song.')
+                    await message.channel.send('Error deleting song.')
                 elif response[0] == 2:
-                    await client.send_message(message.channel, 'No playlists')
+                    await message.channel.send('No playlists')
                 elif response[0] == 3:
-                    await client.send_message(message.channel, 'Invalid character(s). Remove or replace any non-ascii characters.')
+                    await message.channel.send('Invalid character(s). Remove or replace any non-ascii characters.')
                 elif response[0] == 4:
-                    await client.send_message(message.channel, 'No playlists with name `{}`'.format(msg[0]))
+                    await message.channel.send('No playlists with name `{}`'.format(msg[0]))
                 elif response[0] == 0:
-                    await client.send_message(message.channel, 'Song successfully removed.')
+                    await message.channel.send('Song successfully removed.')
             else:
-                await client.send_message(message.channel, ':x:***You are not allowed to execute that command!***')
+                await message.channel.send(':x:***You are not allowed to execute that command!***')
 
         elif message.content.lower().startswith('%splaylist' % PREF):
             msg = message.content.lower()
@@ -382,26 +379,26 @@ async def on_message(message):
             msgList.pop(0)
 
             if msgList == []:
-                await client.send_message(message.channel, ':x:** Proper use:** `%splaylist <playlist\'s name>`' % PREF)
+                await message.channel.send(':x:** Proper use:** `%splaylist <playlist\'s name>`' % PREF)
                 return
 
             msg = ' '.join(msgList)
             logger.info(
-                ('Received command > playlist >> {1} | From {0.author} in {0.server.name}/{0.channel}'.format(message, msg)))
+                ('Received command > playlist >> {1} | From {0.author} in {0.guild.name}/{0.channel}'.format(message, msg)))
 
             response = await getPlaylist(msg)
 
             if response[0] == 1:
-                await client.send_message(message.channel, 'No playlist with name `{}`'.format(msg))
+                await message.channel.send('No playlist with name `{}`'.format(msg))
             elif response[0] == 2:
-                await client.send_message(message.channel, 'No playlists.')
+                await message.channel.send('No playlists.')
             elif response[0] == 3:
-                await client.send_message(message.channel, 'Invalid character(s). Remove or replace any non-ascii characters.')
+                await message.channel.send('Invalid character(s). Remove or replace any non-ascii characters.')
             elif response[0] == 0:
-                await client.send_message(message.channel, response[1])
+                await message.channel.send(response[1])
 
         elif message.content.lower().startswith('%sclear' % PREF):
-            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_server) or (message.author.id == '312223735505747968') == True:
+            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_guild) or (message.author.id == 312223735505747968) == True:
                 msg = message.content.lower()
                 msgList = msg.split()
                 msgList.pop(0)
@@ -418,9 +415,9 @@ async def on_message(message):
 
     elif message.content.lower().startswith('%sdebug' % PREF):
         for role in message.author.roles:
-            await client.send_message(message.author, ', '.join(str(x) for x in [role, role.id, role.name, role.permissions, role.server, role.color, role.hoist, role.position, role.managed, role.mentionable, role.is_everyone, role.created_at, role.mention]))
-            await client.send_message(message.author, '=====')
-        await client.send_message(message.author, 'Finished')
+            await message.author.send(', '.join(str(x) for x in [role, role.id, role.name, role.permissions, role.guild, role.color, role.hoist, role.position, role.managed, role.mentionable, role.is_everyone, role.created_at, role.mention]))
+            await message.author.send('=====')
+        await message.author.send('Finished')
 
 @client.event
 async def on_ready():
@@ -435,13 +432,13 @@ async def on_resumed():
 
 @client.event
 async def on_member_update(bef, aft):
-    if '408991159990616074' in [y.id for y in bef.roles]:
-        if '408991159990616074' not in [y.id for y in aft.roles]:
-            await client.send_message(discord.Object(id='409023617549205515'), '{0}, if you want to obtain PREMIUM ⭐ role, type in `{1}verify` in {2}'.format(aft.mention, PREF, aft.server._channels['409066385453613079'].mention))
+    if 408991159990616074 in [y.id for y in bef.roles]:
+        if 408991159990616074 not in [y.id for y in aft.roles]:
+            await client.send_message(discord.Object(id=409023617549205515), '{0}, if you want to obtain PREMIUM ⭐ role, type in `{1}verify` in {2}'.format(aft.mention, PREF, aft.guild._channels[409066385453613079].mention))
 
 if __name__ == "__main__":
     logger.info(('Starting code...'))
-    client.loop.create_task(statusChange())
+    #client.loop.create_task(statusChange())
     while True:
         try:
             client.loop.run_until_complete(client.start(DISCORDTOKEN))
