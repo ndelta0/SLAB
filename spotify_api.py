@@ -27,7 +27,7 @@ for i in range(len(settings)):
     settingsDict.update(extendDict)
 boundChannelsStr = settingsDict['boundChannels']
 boundChannelsList = boundChannelsStr.split()
-settingsDict['boundChannels'] = boundChannelsList
+settingsDict['boundChannels'] = [int(chid) for chid in boundChannelsList]
 
 botCursor.execute('SELECT * FROM playlists')
 playlists = botCursor.fetchall()
