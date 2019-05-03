@@ -6,7 +6,6 @@ import threading
 import colorama
 import discord
 import mysql.connector
-#from discord.compat import create_task
 from spotify_api import *
 
 colorama.init(autoreset=True)
@@ -30,8 +29,8 @@ boundChannelsStr = settingsDict['boundChannels']
 boundChannelsList = boundChannelsStr.split()
 settingsDict['boundChannels'] = [int(chid) for chid in boundChannelsList]
 
-settingsDict['boundChannels'].append(516168648373698563)
-settingsDict['discordToken'] = 'NTE2MTY5MTUxODQ1MzY3ODA5.XMXzBw.CjCKJH4pF0z0gCZovN10ah2GNTU'
+# settingsDict['boundChannels'].append(516168648373698563)
+# settingsDict['discordToken'] = 'NTE2MTY5MTUxODQ1MzY3ODA5.XMXzBw.CjCKJH4pF0z0gCZovN10ah2GNTU'
 
 # Variables & classes
 class MyFormatter(logging.Formatter):
@@ -82,13 +81,25 @@ async def statusChange():
     while 1:
         try:
             await client.wait_until_ready()
-            await client.change_presence(game=discord.Game(name='SLAB v{}{}'.format(botVersion, suffix)))
+            # version
+            a = discord.Activity()
+            a.application_id = 1
+            a.name = 'Version {}{}'.format(botVersion, suffix)
+            a.type = discord.ActivityType.playing
+
+            await client.change_presence(status=discord.Status.online, activity=a)
             await asyncio.sleep(15)
-            helpStr = 'Type %shelp for help!' % PREF
-            await client.change_presence(game=discord.Game(name=helpStr))
+
+            # help
+            b = discord.Activity()
+            b.application_id = 1
+            b.name = '{}help for help!'.format(PREF)
+            b.type = discord.ActivityType.listening
+
+            await client.change_presence(status=discord.Status.online, activity=b)
             await asyncio.sleep(15)
         except BaseException as err:
-            logger.critical('Exception occurred: {} '.format(err))
+            logger.critical('Exception occurred (status change): {} '.format(err))
             break
 
 @client.event
@@ -103,7 +114,7 @@ async def on_message(message):
 
     if message.content.lower().startswith('%sbind' % PREF):
         logger.info(
-            ('Received command > bind | From {0.author} in {0..name}/{0.channel}'.format(message)))
+            ('Received command > bind | From {0.author} in {0.guild.name}/{0.channel}'.format(message)))
         if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_guild) or (message.author.id == 312223735505747968) == True:
             if message.channel.id in boundChannels:
                 await message.channel.send('Already bound')
@@ -124,8 +135,7 @@ async def on_message(message):
                 await message.channel.send('Not binded')
             else:
                 boundChannels.remove(message.channel.id)
-                await dbUpdateSettings(
-                    ['boundChannels', ' '.join(boundChannels)])
+                await dbUpdateSettings(['boundChannels', ' '.join([str(chid) for chid in boundChannels])])
                 await message.channel.send('***Unbound from this channel.***')
                 return boundChannels
         else:
@@ -142,8 +152,7 @@ async def on_message(message):
                 return
 
             msg = ' '.join(msgList)
-            logger.info(
-                ('Received command > search >> {1} | From {0.author} in {0.guild.name}/{0.channel}'.format(message, msg)))
+            logger.info(('Received command > search >> {1} | From {0.author} in {0.guild.name}/{0.channel}'.format(message, msg)))
             # await message.channel.send(msg)
             response = await searchSong(msg)
 
@@ -178,7 +187,7 @@ async def on_message(message):
                     plName = ' '.join(ans.content.split()[1:])
                     admin = False
                     if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_guild) or (message.author.id == 312223735505747968) == True: admin = True
-                    addResp = await addToPlaylist(plName, response[2], message.author.id, admin)
+                    addResp = await addToPlaylist(plName, response[2], str(message.author.id), admin)
                     if addResp[0] == 0:
                         await message.channel.send('Successfully added to playlist `{}`'.format(plName))
                     elif addResp[0] == 1:
@@ -189,7 +198,6 @@ async def on_message(message):
                         await message.channel.send('You already done your part creating the playlist')
                 elif ans.content.lower().startswith('{}no'.format(PREF)):
                     await message.channel.send('Cancelled.')
-                await message.channel.send('Timed out.')
 
         elif message.content.lower().startswith('%screateplaylist' % PREF):
             if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_guild) or (message.author.id == 312223735505747968) == True:
@@ -288,8 +296,8 @@ async def on_message(message):
                 await message.channel.send('Changed prefix to `%s`' % PREF)
                 await dbUpdateSettings((['prefix', PREF]))
                 return PREF
-            else:
-                await message.channel.send(':x:***You are not allowed to execute that command!***')
+
+            await message.channel.send(':x:***You are not allowed to execute that command!***')
 
         elif message.content.lower().startswith('%shelp' % PREF):
             logger.info(
@@ -405,19 +413,11 @@ async def on_message(message):
                 if msgList == []:
                     return
                 limit = int(msgList[0])
-                limit + 1
+                limit += 1
                 limit = clamp(n=limit, minn=2, maxn=100)
                 channel = message.channel
-                messages = []
-                async for message in client.logs_from(channel, limit=limit):
-                    messages.append(message)
-                await client.delete_messages(messages)
-
-    elif message.content.lower().startswith('%sdebug' % PREF):
-        for role in message.author.roles:
-            await message.author.send(', '.join(str(x) for x in [role, role.id, role.name, role.permissions, role.guild, role.color, role.hoist, role.position, role.managed, role.mentionable, role.is_everyone, role.created_at, role.mention]))
-            await message.author.send('=====')
-        await message.author.send('Finished')
+                messages = await channel.history(limit=limit).flatten()
+                await channel.delete_messages(messages)
 
 @client.event
 async def on_ready():
@@ -434,11 +434,14 @@ async def on_resumed():
 async def on_member_update(bef, aft):
     if 408991159990616074 in [y.id for y in bef.roles]:
         if 408991159990616074 not in [y.id for y in aft.roles]:
-            await client.send_message(discord.Object(id=409023617549205515), '{0}, if you want to obtain PREMIUM ⭐ role, type in `{1}verify` in {2}'.format(aft.mention, PREF, aft.guild._channels[409066385453613079].mention))
+            await client.get_channel(516168648373698563).send(discord.Object(id=409023617549205515), '{0}, if you want to obtain PREMIUM ⭐ role, type in `{1}verify` in {2}'.format(aft.mention, PREF, client.get_channel(516168648373698563).mention))
 
 if __name__ == "__main__":
     logger.info(('Starting code...'))
-    #client.loop.create_task(statusChange())
+
+    loop = asyncio.get_event_loop()
+    loop.create_task(statusChange())
+
     while True:
         try:
             client.loop.run_until_complete(client.start(DISCORDTOKEN))
@@ -455,7 +458,7 @@ if __name__ == "__main__":
         except RuntimeError as err:
             logger.critical('Exception occurred: {} '.format(err))
             client.close()
-        except BaseException as err:
+        except Exception as err:
             logger.critical('Exception occurred: {} '.format(err))
             logger.info('Trying to reconnect...')
             client.logout()
