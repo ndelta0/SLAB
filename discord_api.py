@@ -29,8 +29,8 @@ boundChannelsStr = settingsDict['boundChannels']
 boundChannelsList = boundChannelsStr.split()
 settingsDict['boundChannels'] = [int(chid) for chid in boundChannelsList]
 
-# settingsDict['boundChannels'].append(516168648373698563)
-# settingsDict['discordToken'] = 'NTE2MTY5MTUxODQ1MzY3ODA5.XMXzBw.CjCKJH4pF0z0gCZovN10ah2GNTU'
+settingsDict['boundChannels'].append(516168648373698563)
+settingsDict['discordToken'] = 'NTE2MTY5MTUxODQ1MzY3ODA5.XMXzBw.CjCKJH4pF0z0gCZovN10ah2GNTU'
 
 # Variables & classes
 class MyFormatter(logging.Formatter):
@@ -341,8 +341,8 @@ async def on_message(message):
                 ('Received command > verify | From {0.author} in {0.guild.name}/{0.channel}'.format(message)))
             guildObj = client.get_guild(message.guild.id)
             memberObj = message.author
-            response = await verifyPremiumStep1()
-            await message.author.send(('To verify the account go to the following page and paste in the token:\n' + response))
+            response = await verifyPremiumStep1(message.author.id)
+            await message.author.send(('To verify the account go to the following page and paste in the token (yup, I know that it\'s long and suspicious, but trust me, it\'s a link to Spotify page):\n' + response))
             answ = await client.wait_for('message', timeout=600)
             authResponse = await verifyPremiumStep2(answ.content)
             if authResponse == True:
@@ -419,6 +419,28 @@ async def on_message(message):
                 messages = await channel.history(limit=limit).flatten()
                 await channel.delete_messages(messages)
 
+        elif message.content.lower().startswith('%sdb-update' % PREF):
+            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_guild) or (message.author.id == 312223735505747968) == True:
+                members_updt = []
+                for member in message.guild.members:
+                    if not member.bot:
+                        data = {'discordid': member.id, 'username': member.name+'#'+member.discriminator, 'warn_times': 0}
+                        premium = {'premium': False}
+                        if discord.utils.get(client.guilds[0].roles, name='PREMIUM ⭐') in member.roles:
+                            premium['premium'] = True
+                        data.update(premium)
+                        sql = "INSERT INTO users (discordid, username, premium, warn_times) VALUES ('%s', '%s', %s, %s)" % (str(data['discordid']), data['username'], data['premium'], data['warn_times'])
+                        try:
+                            botCursor.execute(sql)
+                            database.commit()
+                        except BaseException as err:
+                            logger.critical('Exception occurred: {} '.format(err))
+                            database.reconnect(100)
+                            botCursor.execute(sql)
+                            database.commit()
+                        members_updt.append(member.name+'#'+member.discriminator)
+                await message.channel.send('Users inserted: {} - {}'.format(len(members_updt), ', '.join(members_updt)))
+                
 @client.event
 async def on_ready():
     logger.info(('Logging in as:'))
