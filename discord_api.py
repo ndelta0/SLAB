@@ -11,11 +11,18 @@ from spotify_api import *
 
 colorama.init(autoreset=True)
 # MySQL
+cldb = os.environ['CLEARDB_DATABASE_URL']
+cldb = cldb.split('@')
+cldb[0] = cldb[0].replace('mysql://', '')
+cred = cldb[0].split(':')
+cldb[1] = cldb[1].replace('?reconnect=true', '')
+uri = cldb[1].split('/')
+
 database = mysql.connector.connect(
-    host=os.environ['db-host'],
-    user=os.environ['db-user'],
-    passwd=os.environ['db-passwd'],
-    database=os.environ['db-dbname']
+    host=uri[0],
+    user=cred[0],
+    passwd=cred[1],
+    database=uri[1]
 )
 botCursor = database.cursor()
 
@@ -75,7 +82,7 @@ async def statusChange():
     global statusRun
     suffix = os.environ.get('bot-build', 'n/d')
     await client.wait_until_ready()
-    botVersion = os.environ['botVersion']
+    botVersion = os.environ.get('botVersion', 'n/d')
     while 1:
         try:
             await client.wait_until_ready()
