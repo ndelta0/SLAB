@@ -6,6 +6,7 @@ import threading
 import colorama
 import discord
 import mysql.connector
+import _datetime
 from spotify_api import *
 
 colorama.init(autoreset=True)
@@ -72,10 +73,7 @@ client = discord.Client()
 
 async def statusChange():
     global statusRun
-    if os.environ['bot-build'] == 'dev':
-        suffix = '-dev'
-    elif os.environ['bot-build'] == 'stable':
-        suffix = '-stable'
+    suffix = os.environ.get('bot-build', 'n/d')
     await client.wait_until_ready()
     botVersion = os.environ['botVersion']
     while 1:
@@ -84,7 +82,7 @@ async def statusChange():
             # version
             a = discord.Activity()
             a.application_id = 1
-            a.name = 'Version {}{}'.format(botVersion, suffix)
+            a.name = 'Version {}{}'.format(botVersion, '-'+suffix)
             a.type = discord.ActivityType.playing
 
             await client.change_presence(status=discord.Status.online, activity=a)
@@ -101,6 +99,37 @@ async def statusChange():
         except BaseException as err:
             logger.critical('Exception occurred (status change): {} '.format(err))
             break
+
+async def muteCheck():
+    await client.wait_until_ready()
+    guildObj = client.get_guild(454888283927871508)
+    role = discord.utils.get(guildObj.roles, name='MUTED')
+    while 1:
+        sql = "SELECT * FROM users WHERE muted = 1"
+        try:
+            botCursor.execute(sql)
+        except BaseException as err:
+            logger.warning('Exception occurred while unmuting: {} '.format(err))
+            database.reconnect(100)
+            botCursor.execute(sql)
+        muted = botCursor.fetchall()
+        if muted != []:
+            operations = []
+            for member in muted:
+                if member[7]-_datetime.datetime.now()<_datetime.timedelta():
+                    user = guildObj.get_member(int(member[1]))
+                    await user.remove_roles(role, reason='Sentence finished')
+                    await user.send('Your sentence has finished. You may now chat in the server.')
+                    sql = "UPDATE users SET mute_end = NULL, muted = 0 WHERE id = {}".format(member[0])
+                    try:
+                        botCursor.execute(sql)
+                        database.commit()
+                    except BaseException as err:
+                        logger.critical('Exception occurred: {} '.format(err))
+                        database.reconnect(100)
+                        botCursor.execute(sql)
+                        database.commit()
+        await asyncio.sleep(300)
 
 @client.event
 async def on_message(message):
@@ -332,6 +361,8 @@ async def on_message(message):
                 name='%sunbind' % PREF, value='Unbinds bot from current channel', inline=True)
             helpEmbed.add_field(
                 name='%sclear <number>'%PREF, value='Clears number of messages in current channel', inline=True)
+            helpEmbed.add_field(
+                name='%swarn <@user>'%PREF, value='Warns mentioned user (warn -> 30 minutes mute -> 1 week mute -> permament mute)', inline=True)
             helpEmbed.set_footer(text='Made with 💖 by {}'.format(
                 str(user)), icon_url=user.avatar_url)
             await message.channel.send(embed=helpEmbed)
@@ -420,6 +451,7 @@ async def on_message(message):
                 await channel.delete_messages(messages)
 
         elif message.content.lower().startswith('%sdb-update' % PREF):
+            logger.info(('Received command > db-update | From {0.author} in {0.guild.name}/{0.channel}'.format(message)))
             if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.manage_channels or message.author.roles[len(message.author.roles)-1].permissions.manage_guild) or (message.author.id == 312223735505747968) == True:
                 members_updt = []
                 for member in message.guild.members:
@@ -440,7 +472,70 @@ async def on_message(message):
                             database.commit()
                         members_updt.append(member.name+'#'+member.discriminator)
                 await message.channel.send('Users inserted: {} - {}'.format(len(members_updt), ', '.join(members_updt)))
-                
+
+        elif message.content.lower().startswith('%swarn' % PREF):
+            logger.info(('Received command > warn >> warned -> {1} | From {0.author} in {0.guild.name}/{0.channel}'.format(message, str(message.mentions[0]))))
+            if (message.author.roles[len(message.author.roles)-1].permissions.administrator or message.author.roles[len(message.author.roles)-1].permissions.kick_members or message.author.roles[len(message.author.roles)-1].permissions.manage_guild) or message.author.roles[len(message.author.roles)-1].permissions.mute_members or (message.author.id == 312223735505747968) == True:
+                warned = message.mentions[0]
+                sql = 'SELECT * FROM users WHERE discordid = \'{}\''.format(str(warned.id))
+                try:
+                    botCursor.execute(sql)
+                except BaseException as err:
+                    logger.critical('Exception occurred: {} '.format(err))
+                    database.reconnect(100)
+                    botCursor.execute(sql)
+                select = botCursor.fetchone()
+                if select[6] == 0:
+                    sql = 'UPDATE users SET warn_times = 1 WHERE discordid = \'{}\''.format(str(warned.id))
+                    try:
+                        botCursor.execute(sql)
+                        database.commit()
+                    except BaseException as err:
+                        logger.critical('Exception occurred: {} '.format(err))
+                        database.reconnect(100)
+                        botCursor.execute(sql)
+                        database.commit()
+                    await message.channel.send('Watch out {}! It\'s your first warning. No punishment this time buddy.'.format(warned.mention))
+                elif select[6] == 1:
+                    sql = 'UPDATE users SET warn_times = 2, muted = True, mute_end = \'{}\' WHERE discordid = \'{}\''.format(_datetime.datetime.now()+_datetime.timedelta(minutes=30), warned.id)
+                    try:
+                        botCursor.execute(sql)
+                        database.commit()
+                    except BaseException as err:
+                        logger.critical('Exception occurred: {} '.format(err))
+                        database.reconnect(100)
+                        botCursor.execute(sql)
+                        database.commit()
+                    role = discord.utils.get(message.guild.roles, name='MUTED')
+                    await warned.add_roles(role, reason='Member muted for 30 minutes')
+                    await message.channel.send('Hey there {}! I\'m sorry to say this, but I muted you for **30 minutes**. If you think that is wrong, contact an administrator directly.'.format(warned.mention))
+                elif select[6] == 2:
+                    sql = 'UPDATE users SET warn_times = 3, muted = True, mute_end = \'{}\' WHERE discordid = \'{}\''.format(_datetime.datetime.now()+_datetime.timedelta(weeks=1), warned.id)
+                    try:
+                        botCursor.execute(sql)
+                        database.commit()
+                    except BaseException as err:
+                        logger.critical('Exception occurred: {} '.format(err))
+                        database.reconnect(100)
+                        botCursor.execute(sql)
+                        database.commit()
+                    role = discord.utils.get(message.guild.roles, name='MUTED')
+                    await warned.add_roles(role, reason='Member muted for 1 week')
+                    await message.channel.send('Oi mate {}! I\'m sad to say this, but you have been muted for **1 week**. If you think that is wrong, contact an administrator directly.'.format(warned.mention))
+                elif select[6] == 3:
+                    sql = 'UPDATE users SET warn_times = 4, muted = True, mute_end = \'{}\' WHERE discordid = \'{}\''.format(_datetime.datetime.now()+_datetime.timedelta(days=3652, hours=12), warned.id)
+                    try:
+                        botCursor.execute(sql)
+                        database.commit()
+                    except BaseException as err:
+                        logger.critical('Exception occurred: {} '.format(err))
+                        database.reconnect(100)
+                        botCursor.execute(sql)
+                        database.commit()
+                    role = discord.utils.get(message.guild.roles, name='MUTED')
+                    await warned.add_roles(role, reason='Member muted permamently')
+                    await message.channel.send('That\'s it {}! I\'m really sad to say this, but you have been muted permamently (not permamently, **10 years** tho). If you think that is wrong, contact an administrator directly.'.format(warned.mention))
+
 @client.event
 async def on_ready():
     logger.info(('Logging in as:'))
@@ -458,11 +553,33 @@ async def on_member_update(bef, aft):
         if 408991159990616074 not in [y.id for y in aft.roles]:
             await client.get_channel(516168648373698563).send(discord.Object(id=409023617549205515), '{0}, if you want to obtain PREMIUM ⭐ role, type in `{1}verify` in {2}'.format(aft.mention, PREF, client.get_channel(516168648373698563).mention))
 
+@client.event
+async def on_member_join(member):
+    sql = "SELECT * FROM users WHERE discordid = '{}'".format(str(member.id))
+    try:
+        botCursor.execute(sql)
+    except BaseException as err:
+        logger.critical('Exception occurred: {} '.format(err))
+        database.reconnect(100)
+        botCursor.execute(sql)
+    if not botCursor.fetchone():
+        data = {'discordid': member.id, 'username': member.name+'#'+member.discriminator, 'warn_times': 0, 'premium': False}
+        sql = "INSERT INTO users (discordid, username, premium, warn_times, muted) VALUES ('%s', '%s', %s, %s, 0)" % (str(data['discordid']), data['username'], data['premium'], data['warn_times'])
+        try:
+            botCursor.execute(sql)
+            database.commit()
+        except BaseException as err:
+            logger.critical('Exception occurred: {} '.format(err))
+            database.reconnect(100)
+            botCursor.execute(sql)
+            database.commit()
+
 if __name__ == "__main__":
     logger.info(('Starting code...'))
 
     loop = asyncio.get_event_loop()
     loop.create_task(statusChange())
+    loop.create_task(muteCheck())
 
     while True:
         try:
