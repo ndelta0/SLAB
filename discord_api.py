@@ -110,13 +110,13 @@ async def statusChange():
 async def muteCheck():
     await client.wait_until_ready()
     guildObj = client.get_guild(454888283927871508)
-    role = discord.utils.get(guildObj.roles, name='MUTED')
+    role = guildObj.get_role(574186709382856714)
     while 1:
         sql = "SELECT * FROM users WHERE muted = 1"
         try:
             botCursor.execute(sql)
         except BaseException as err:
-            logger.warning('Exception occurred while unmuting: {} '.format(err))
+            logger.info('Exception occurred while unmuting: {} '.format(err))
             database.reconnect(100)
             botCursor.execute(sql)
         muted = botCursor.fetchall()
