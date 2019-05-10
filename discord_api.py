@@ -485,7 +485,8 @@ async def on_message(message):
                 members_updt = []
                 for member in message.guild.members:
                     if not member.bot:
-                        data = {'discordid': member.id, 'username': member.name+'#'+member.discriminator, 'warn_times': 0}
+                        nameSafe = bytes(member.name, 'utf-8').decode('utf-8', 'ignore')
+                        data = {'discordid': member.id, 'username': nameSafe+'#'+member.discriminator, 'warn_times': 0}
                         premium = {'premium': False}
                         if discord.utils.get(client.guilds[0].roles, name='PREMIUM ⭐') in member.roles:
                             premium['premium'] = True
