@@ -107,6 +107,7 @@ async def statusChange():
 
 async def muteCheck():
     await client.wait_until_ready()
+    await asyncio.sleep(60)
     guildObj = client.get_guild(408958645745745942)
     role = guildObj.get_role(409001540842422292)
     while 1:
@@ -138,10 +139,8 @@ async def muteCheck():
 
 async def subCheck():
     await client.wait_until_ready()
+    await asyncio.sleep(60)
     guildObj = client.get_guild(408958645745745942)
-    if guildObj is None:
-        logger.critical('Could not get guild object')
-        stop(1)
     role = guildObj.get_role(408976689625038848)
     while 1:
         sql = "SELECT * FROM users WHERE has_tokens = 1"
