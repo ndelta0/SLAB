@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Info page</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{url_for('static', filename='css/main.css')}}">
+</head>
+<body>
+  <div id="head">
+    <img src="{{url_for('static', filename='img/slab web.png')}}"/>
+  </div>
+  <div id="body">
+    <div class="content">
+        {{content}}
+    </div>
+  <p style="margin-top: 2%; position: absolute; text-align: left">© 2019 GitHub, Inc.</p>
+  <i style="margin-top: 2%; position: absolute; text-align: right; right: 15px">Thanks for using SLAB!</i>
+</div>
+</body>
+</html>
+

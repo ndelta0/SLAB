@@ -364,6 +364,7 @@ async def addToPlaylist(playlistName, uri, user, admin):
     else:
         return([2])
 
+
 async def getPlaylists():
     global playlistsList
     if len(playlistsList) == 0:
@@ -417,7 +418,7 @@ async def verifyPremiumStep1(author):
     stateBytes = str.encode(state)
     stateBytes = base64.b64encode(stateBytes)
     state = bytes.decode(stateBytes)
-    return 'https://accounts.spotify.com/authorize?client_id=9d77f7ddc6dd46e5af8e6b3138993548&response_type=code&redirect_uri=https://march3wqa.github.io/SLAB/oauth/tokenswap/index.html&scope=user-read-private&show_dialog=true&state={}'.format(state)
+    return 'https://accounts.spotify.com/authorize?client_id=9d77f7ddc6dd46e5af8e6b3138993548&response_type=code&redirect_uri=https://slab-discord.herokuapp.com/callback&scope=user-read-private&state={}'.format(state)
 
 
 async def verifyPremiumStep2(encoded):
@@ -476,8 +477,34 @@ async def verifyPremiumStep2(encoded):
             (str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
         return(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
 
-        
 
+async def checkSubscription(rToken) -> bool:
+    global clientID
+    global clientSecret
+
+    dataBody = {'grant_type': 'refresh_token', 'refresh_token': rToken}
+    authKey = clientID + ':' + clientSecret
+    authKeyBytes = str.encode(authKey)
+    authKeyBytes = base64.b64encode(authKeyBytes)
+    authKey = bytes.decode(authKeyBytes)
+    authHeader = {'Authorization': 'Basic ' + authKey}
+
+    resp = rq.post(url='https://accounts.spotify.com/api/token',
+                    data=dataBody, headers=authHeader)
+    respJson = resp.json()
+
+    if resp.status_code == 200:
+        aToken = respJson['access_token']
+    else:
+        return False
+
+    authHeader = {'Authorization': 'Bearer ' + aToken}
+    resp = rq.get(url='https://api.spotify.com/v1/me', headers=authHeader)
+    respJson = resp.json()
+    if resp.status_code == 200:
+        if respJson['product'] == 'premium':
+            return True
+    return False
 
 async def getPlaylist(name):
     global playlistsList
