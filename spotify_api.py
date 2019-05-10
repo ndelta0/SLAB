@@ -10,11 +10,18 @@ import mysql.connector
 import requests as rq
 
 # MySQL
+cldb = os.environ['CLEARDB_DATABASE_URL']
+cldb = cldb.split('@')
+cldb[0] = cldb[0].replace('mysql://', '')
+cred = cldb[0].split(':')
+cldb[1] = cldb[1].replace('?reconnect=true', '')
+uri = cldb[1].split('/')
+
 database = mysql.connector.connect(
-    host=os.environ['db-host'],
-    user=os.environ['db-user'],
-    passwd=os.environ['db-passwd'],
-    database=os.environ['db-dbname']
+    host=uri[0],
+    user=cred[0],
+    passwd=cred[1],
+    database=uri[1]
 )
 botCursor = database.cursor()
 
@@ -357,6 +364,7 @@ async def addToPlaylist(playlistName, uri, user, admin):
     else:
         return([2])
 
+
 async def getPlaylists():
     global playlistsList
     if len(playlistsList) == 0:
@@ -401,27 +409,102 @@ async def removeSong(URI, playlistName):
         return([1])
 
 
-async def verifyPremiumStep1():
-    baseUrl = 'https://accounts.spotify.com/authorize'
-    queryParams = 'client_id={}&response_type=token&redirect_uri=https://march3wqa.github.io/SLAB/oauth/token/index.html&scope=user-read-private'
-    finalUrl = baseUrl + '?' + queryParams.format(clientID)
-    return finalUrl
+async def verifyPremiumStep1(author):
+    # baseUrl = 'https://accounts.spotify.com/authorize'
+    # queryParams = 'client_id={}&response_type=token&redirect_uri=https://march3wqa.github.io/SLAB/oauth/token/index.html&scope=user-read-private'
+    # finalUrl = baseUrl + '?' + queryParams.format(clientID)
+    # return finalUrl
+    state = str(author)
+    stateBytes = str.encode(state)
+    stateBytes = base64.b64encode(stateBytes)
+    state = bytes.decode(stateBytes)
+    return 'https://accounts.spotify.com/authorize?client_id=9d77f7ddc6dd46e5af8e6b3138993548&response_type=code&redirect_uri=https://slab-discord.herokuapp.com/callback&scope=user-read-private&state={}'.format(state)
 
 
-async def verifyPremiumStep2(token):
-    authHeader = {'Authorization': 'Bearer ' + token}
+async def verifyPremiumStep2(encoded):
+    # authHeader = {'Authorization': 'Bearer ' + token}
+    # resp = rq.get(url='https://api.spotify.com/v1/me', headers=authHeader)
+    # respJson = resp.json()
+    # if resp.status_code == 200:
+    #     if respJson['product'] == 'premium':
+    #         return True
+    #     else:
+    #         return False
+    # else:
+    #     logger.error(
+    #         (str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
+    #     return(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
+    decrypted = base64.b64decode(encoded)
+    decrypted = decrypted.split(b'#')
+
+    code = bytes.decode(decrypted[0])
+    author = bytes.decode(decrypted[1])
+
+    authKey = clientID + ':' + clientSecret
+    authKeyBytes = str.encode(authKey)
+    authKeyBytes = base64.b64encode(authKeyBytes)
+    authKey = bytes.decode(authKeyBytes)
+    authHeader = {'Authorization': 'Basic ' + authKey}
+    dataBody = {'grant_type': 'authorization_code', 'code': code,
+                'redirect_uri': 'https://march3wqa.github.io/SLAB/oauth/tokenswap/index.html'}
+
+    resp = rq.post(url='https://accounts.spotify.com/api/token', data=dataBody, headers=authHeader)
+    respJson = resp.json()
+
+    if resp.status_code == 200:
+        aToken = respJson['access_token']
+        rToken = respJson['refresh_token']
+
+        sql = 'UPDATE users SET spotify_access_token = \'{}\', spotify_refresh_token = \'{}\' WHERE discordid = \'{}\''.format(aToken, rToken, author)
+        try:
+            botCursor.execute(sql)
+            database.commit()
+        except BaseException as err:
+            logger.critical('Exception occurred: {} '.format(err))
+            database.reconnect(100)
+            botCursor.execute(sql)
+            database.commit()
+        
+        authHeader = {'Authorization': 'Bearer ' + aToken}
+        resp = rq.get(url='https://api.spotify.com/v1/me', headers=authHeader)
+        respJson = resp.json()
+        if resp.status_code == 200:
+            if respJson['product'] == 'premium':
+                return True
+            return False
+        
+        logger.error(
+            (str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
+        return(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
+
+
+async def checkSubscription(rToken) -> bool:
+    global clientID
+    global clientSecret
+
+    dataBody = {'grant_type': 'refresh_token', 'refresh_token': rToken}
+    authKey = clientID + ':' + clientSecret
+    authKeyBytes = str.encode(authKey)
+    authKeyBytes = base64.b64encode(authKeyBytes)
+    authKey = bytes.decode(authKeyBytes)
+    authHeader = {'Authorization': 'Basic ' + authKey}
+
+    resp = rq.post(url='https://accounts.spotify.com/api/token',
+                    data=dataBody, headers=authHeader)
+    respJson = resp.json()
+
+    if resp.status_code == 200:
+        aToken = respJson['access_token']
+    else:
+        return False
+
+    authHeader = {'Authorization': 'Bearer ' + aToken}
     resp = rq.get(url='https://api.spotify.com/v1/me', headers=authHeader)
     respJson = resp.json()
     if resp.status_code == 200:
         if respJson['product'] == 'premium':
             return True
-        else:
-            return False
-    else:
-        logger.error(
-            (str(respJson['error']['status']) + ' >> ' + respJson['error']['message']))
-        return(str(respJson['error']['status']) + ' >> ' + respJson['error']['message'])
-
+    return False
 
 async def getPlaylist(name):
     global playlistsList
