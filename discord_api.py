@@ -486,12 +486,12 @@ async def on_message(message):
                 for member in message.guild.members:
                     if not member.bot:
                         nameSafe = bytes(member.name, 'utf-8').decode('utf-8', 'ignore')
-                        data = {'discordid': member.id, 'username': nameSafe+'#'+member.discriminator, 'warn_times': 0}
+                        data = {'discordid': member.id, 'warn_times': 0}
                         premium = {'premium': False}
                         if discord.utils.get(client.guilds[0].roles, name='PREMIUM ⭐') in member.roles:
                             premium['premium'] = True
                         data.update(premium)
-                        sql = "INSERT INTO users (discordid, username, premium, warn_times) VALUES ('%s', '%s', %s, %s)" % (str(data['discordid']), data['username'], data['premium'], data['warn_times'])
+                        sql = "INSERT INTO users (discordid, premium, warn_times) VALUES ('%s', %s, %s)" % (str(data['discordid']), data['premium'], data['warn_times'])
                         try:
                             botCursor.execute(sql)
                             database.commit()
