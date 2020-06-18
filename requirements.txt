@@ -1,5 +1,5 @@
 discord.py==1.0.1
-requests==2.21.0
+requests==2.24.0
 asyncio==3.4.3
 mysql-connector==2.2.9
 colorama==0.4.1
